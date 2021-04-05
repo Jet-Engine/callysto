@@ -4,6 +4,7 @@ use crate::kafka::CTopic;
 use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
 use lever::prelude::{LOTable, HOPTable};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Callysto<Store>
 where
@@ -12,8 +13,9 @@ where
     app_name: String,
     storage: Store,
     broker: String,
-    tasks: LOTable<String, Arc<dyn TaskDef<Store>>>,
-    services: LOTable<String, Arc<dyn ServiceDef<Store>>>,
+    stubs: Arc<AtomicUsize>,
+    tasks: LOTable<usize, Arc<dyn TaskDef<Store>>>,
+    services: LOTable<usize, Arc<dyn ServiceDef<Store>>>,
 }
 
 impl Callysto<()> {
@@ -37,6 +39,7 @@ where
         Self {
             app_name: "callysto-app".to_owned(),
             storage,
+            stubs: Arc::new(AtomicUsize::default()),
             broker: "localhost:9092".to_owned(),
             tasks: LOTable::default(),
             services: LOTable::default()
@@ -49,7 +52,9 @@ where
     }
 
     pub fn task(&mut self, t: impl TaskDef<Store>) -> &mut Self {
-        todo!()
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        self.tasks.insert(stub, Arc::new(t));
+        self
     }
 
     pub fn timer(&mut self, t: impl TaskDef<Store>) -> &mut Self {
