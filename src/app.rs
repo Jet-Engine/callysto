@@ -15,6 +15,7 @@ where
     broker: String,
     stubs: Arc<AtomicUsize>,
     tasks: LOTable<usize, Arc<dyn TaskDef<Store>>>,
+    timers: LOTable<usize, Arc<dyn TaskDef<Store>>>,
     services: LOTable<usize, Arc<dyn ServiceDef<Store>>>,
 }
 
@@ -42,6 +43,7 @@ where
             stubs: Arc::new(AtomicUsize::default()),
             broker: "localhost:9092".to_owned(),
             tasks: LOTable::default(),
+            timers: LOTable::default(),
             services: LOTable::default()
         }
     }
@@ -51,18 +53,22 @@ where
         self
     }
 
-    pub fn task(&mut self, t: impl TaskDef<Store>) -> &mut Self {
+    pub fn task(&self, t: impl TaskDef<Store>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.tasks.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn timer(&mut self, t: impl TaskDef<Store>) -> &mut Self {
-        todo!()
+    pub fn timer(&self, t: impl TaskDef<Store>) -> &Self {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        self.timers.insert(stub, Arc::new(t));
+        self
     }
 
-    pub fn service(&mut self, s: impl ServiceDef<Store>) -> &mut Self {
-        todo!()
+    pub fn service(&self, s: impl ServiceDef<Store>) -> &Self {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        self.services.insert(stub, Arc::new(s));
+        self
     }
 
     pub fn topic(&self) -> CTopic {
