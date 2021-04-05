@@ -34,7 +34,18 @@ where
     Store: Clone + Send + Sync + 'static
 {
     pub fn with_storage(storage: Store) -> Self {
-        todo!()
+        Self {
+            app_name: "callysto-app".to_owned(),
+            storage,
+            broker: "localhost:9092".to_owned(),
+            tasks: LOTable::default(),
+            services: LOTable::default()
+        }
+    }
+
+    pub fn name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
+        self.app_name = name.as_ref().to_string();
+        self
     }
 
     pub fn task(&mut self, t: impl TaskDef<Store>) -> &mut Self {
