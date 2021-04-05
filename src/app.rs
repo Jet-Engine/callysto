@@ -12,7 +12,7 @@ where
 {
     app_name: String,
     storage: Store,
-    broker: String,
+    brokers: String,
     stubs: Arc<AtomicUsize>,
     tasks: LOTable<usize, Arc<dyn TaskDef<Store>>>,
     timers: LOTable<usize, Arc<dyn TaskDef<Store>>>,
@@ -41,15 +41,20 @@ where
             app_name: "callysto-app".to_owned(),
             storage,
             stubs: Arc::new(AtomicUsize::default()),
-            broker: "localhost:9092".to_owned(),
+            brokers: "localhost:9092".to_owned(),
             tasks: LOTable::default(),
             timers: LOTable::default(),
             services: LOTable::default()
         }
     }
 
-    pub fn name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
+    pub fn with_name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
         self.app_name = name.as_ref().to_string();
+        self
+    }
+
+    pub fn with_brokers<T: AsRef<str>>(&mut self, brokers: T) -> &mut Self {
+        self.brokers = brokers.as_ref().to_string();
         self
     }
 

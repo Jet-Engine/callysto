@@ -17,5 +17,5 @@ impl State {
 
 fn main() {
     let app = Callysto::with_storage(State::new())
-        .name("basic-app");
+        .with_name("basic-app");
 }
