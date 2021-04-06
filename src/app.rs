@@ -5,6 +5,7 @@ use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
 use lever::prelude::{LOTable, HOPTable};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::prelude::CronJob;
 
 pub struct Callysto<Store>
 where
@@ -16,6 +17,7 @@ where
     stubs: Arc<AtomicUsize>,
     tasks: LOTable<usize, Arc<dyn TaskDef<Store>>>,
     timers: LOTable<usize, Arc<dyn TaskDef<Store>>>,
+    cronjobs: LOTable<usize, Arc<CronJob<Store>>>,
     services: LOTable<usize, Arc<dyn ServiceDef<Store>>>,
 }
 
@@ -44,6 +46,7 @@ where
             brokers: "localhost:9092".to_owned(),
             tasks: LOTable::default(),
             timers: LOTable::default(),
+            cronjobs: LOTable::default(),
             services: LOTable::default()
         }
     }
@@ -73,6 +76,13 @@ where
     pub fn service(&self, s: impl ServiceDef<Store>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
+        self
+    }
+
+    pub fn crontab<C: AsRef<str>>(&self, cron_expr: C, t: impl TaskDef<Store>) -> &Self {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let cron_job = Arc::new(CronJob::new(cron_expr, t));
+        self.cronjobs.insert(stub, cron_job);
         self
     }
 

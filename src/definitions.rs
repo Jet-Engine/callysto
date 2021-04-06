@@ -1,6 +1,7 @@
 use async_trait::*;
 use crate::errors::{Result as CResult};
 use std::future::Future;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait TaskDef<State>: Send + Sync + 'static
@@ -48,6 +49,23 @@ impl<State, F, Fut> ServiceDef<State> for F
     }
 }
 
+pub struct CronJob<Store>
+{
+    cron_expr: String,
+    pub job: Box<dyn TaskDef<Store>>
+}
+
+impl<Store> CronJob<Store>
+where
+    Store: Clone + Send + Sync + 'static
+{
+    pub fn new<T: AsRef<str>>(cron_expr: T, job: impl TaskDef<Store>) -> Self {
+        Self { cron_expr: cron_expr.as_ref().to_owned(), job: Box::new(job) }
+    }
+}
+
+///
+/// Context passed to every closure of every module definition
 pub struct Context<State>
 where
     State: Clone + Send + Sync + 'static

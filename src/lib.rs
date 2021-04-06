@@ -4,6 +4,7 @@ pub mod enums;
 pub mod app;
 pub mod definitions;
 pub mod errors;
+pub mod confg;
 
 pub mod prelude {
     pub use super::kafka::*;
@@ -12,6 +13,7 @@ pub mod prelude {
     pub use super::app::*;
     pub use super::definitions::*;
     pub use super::errors::*;
+    pub use super::confg::*;
 }
 
 #[cfg(test)]
