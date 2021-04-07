@@ -1,11 +1,13 @@
 use crate::definitions::{TaskDef, ServiceDef};
 use crate::table::CTable;
-use crate::kafka::CTopic;
+use crate::kafka::{CTopic, BastionRuntime};
 use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
 use lever::prelude::{LOTable, HOPTable};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::prelude::CronJob;
+use rdkafka::ClientConfig;
+use rdkafka::consumer::{StreamConsumer, Consumer};
 
 pub struct Callysto<Store>
 where
@@ -86,11 +88,27 @@ where
         self
     }
 
-    pub fn topic(&self) -> CTopic {
+    pub fn topic<T>(&self, topic: T) -> CTopic
+    where
+        T: AsRef<str>
+    {
+        let consumer: StreamConsumer<_, BastionRuntime> = ClientConfig::new()
+            .set("bootstrap.servers", &*self.brokers)
+            .set("session.timeout.ms", "6000")
+            .set("enable.auto.commit", "true")
+            .set("auto.offset.reset", "earliest")
+            .set("group.id", "callysto")
+            .set("isolation.level", "read_uncommitted")
+            .create()
+            .expect("Consumer creation failed");
+        consumer.subscribe(&[topic.as_ref()]).unwrap();
         todo!()
     }
 
     pub fn table(&self) -> CTable {
         todo!()
     }
+
+    // TODO: page method to serve
+    // TODO: table_route method to give data based on page slug
 }
