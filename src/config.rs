@@ -41,6 +41,12 @@ pub struct Config {
     /// If the consumer crashes or is unable to send heartbeats for a duration of `session.timeout.ms` (in Callysto it is [session_timeout_ms]),
     /// then the consumer will be considered dead and its partitions will be reassigned.
     max_poll_interval_ms: usize,
+
+    ///
+    /// The maximum amount of time the client will wait for the response of a request.
+    /// If the response is not received before the timeout elapses the client will resend the
+    /// request if necessary or fail the request if retries are exhausted.
+    request_timeout_ms: usize
 }
 
 impl Default for Config {
@@ -48,12 +54,13 @@ impl Default for Config {
         Config {
             daemonize: false,
             processing_guarantee: ProcessingGuarantee::AtLeastOnce,
-            session_timeout_ms: 6_000,
+            session_timeout_ms: 60_000,
             enable_auto_commit: false,
             auto_offset_reset: OffsetReset::Latest,
             auto_commit_interval_ms: 5_000,
             enable_auto_offset_store: false,
-            max_poll_interval_ms: 1_000_000 // 16.67 mins
+            max_poll_interval_ms: 1_000_000, // 16.67 mins
+            request_timeout_ms: 90_000
         }
     }
 }
