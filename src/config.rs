@@ -49,6 +49,12 @@ pub struct Config {
     request_timeout_ms: usize
 }
 
+impl Config {
+    fn validate(&self) {
+        todo!("Validate")
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
