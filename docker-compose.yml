@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  redpanda:
+    image: vectorized/redpanda:latest
+    container_name: redpanda-c
+    ports: 
+      - "9092:9092"
+    restart: always
+    command: redpanda start --overprovisioned --smp 1 --memory 10G --reserve-memory 5M --node-id 0 --check=false
