@@ -2,6 +2,7 @@ use std::future::Future;
 use futures::future::{FutureExt};
 use futures_timer::Delay;
 use std::time::Duration;
+use rdkafka::consumer::{DefaultConsumerContext, StreamConsumer};
 use rdkafka::util::AsyncRuntime;
 
 pub struct BastionRuntime;
@@ -21,4 +22,14 @@ impl AsyncRuntime for BastionRuntime {
     }
 }
 
-pub struct CTopic {}
+pub struct CTopic {
+    consumer: StreamConsumer<DefaultConsumerContext, BastionRuntime>
+}
+
+impl CTopic {
+    pub fn new(consumer: StreamConsumer<DefaultConsumerContext, BastionRuntime>) -> Self {
+        Self {
+            consumer
+        }
+    }
+}

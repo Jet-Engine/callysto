@@ -7,7 +7,7 @@ use lever::prelude::{LOTable, HOPTable};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::prelude::{CronJob, Config};
 use rdkafka::ClientConfig;
-use rdkafka::consumer::{StreamConsumer, Consumer};
+use rdkafka::consumer::{StreamConsumer, Consumer, DefaultConsumerContext};
 
 pub struct Callysto<Store>
 where
@@ -149,11 +149,11 @@ where
         };
 
 
-        let consumer: StreamConsumer<_, BastionRuntime> = cc
+        let consumer: StreamConsumer<DefaultConsumerContext, BastionRuntime> = cc
             .create()
             .expect("Consumer creation failed");
         consumer.subscribe(&[topic.as_ref()]).unwrap();
-        todo!()
+        CTopic::new(consumer)
     }
 
     fn build_sasl_context(&self, mut cc: &mut ClientConfig) {
