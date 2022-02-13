@@ -1,4 +1,5 @@
-use crate::{enums::{OffsetReset, ProcessingGuarantee}, prelude::IsolationLevel};
+use crate::{enums::{EndpointIdentificationAlgorithm, OffsetReset, ProcessingGuarantee}, prelude::{IsolationLevel, SecurityProtocol}};
+use crate::enums::{SaslMechanism};
 
 pub struct Config {
     ///
@@ -83,6 +84,38 @@ pub struct Config {
     /// to the messages occurred. This check adds some overhead, so it may be disabled in cases seeking 
     /// extreme performance.
     pub check_crcs: bool,
+
+    ///
+    /// Protocol used to communicate with brokers.
+    pub security_protocol: SecurityProtocol,
+
+    /// SSL Context variable:
+    /// Certificate Authority Location
+    pub ssl_ca_location: Option<String>,
+    /// SSL Context variable:
+    /// Certificate Location
+    pub ssl_certificate_location: Option<String>,
+    /// SSL Context variable:
+    /// SSL Key Location
+    pub ssl_key_location: Option<String>,
+    /// SSL Context variable:
+    /// SSL Password Location
+    pub ssl_key_password: Option<String>,
+
+    /// Endpoint identification algorithm to validate broker hostname using broker certificate.
+    /// * https - Server (broker) hostname verification as specified in RFC2818.
+    /// * none - No endpoint verification. OpenSSL >= 1.0.2 required.
+    pub ssl_endpoint_identification_algorithm: Option<EndpointIdentificationAlgorithm>,
+
+    /// SASL Context
+    /// SASL Mechanism name
+    /// Only one mechanism is allowed to be configured.
+    pub sasl_mechanism: Option<SaslMechanism>,
+
+    /// SASL Username
+    pub sasl_username: Option<String>,
+    /// SASL Password
+    pub sasl_password: Option<String>
 }
 
 impl Config {
@@ -107,7 +140,16 @@ impl Default for Config {
             isolation_level: IsolationLevel::ReadUncommitted,
             max_partition_fetch_bytes: 1024 * 1024,
             fetch_max_wait_ms: 1500,
-            check_crcs: true
+            check_crcs: true,
+            security_protocol: SecurityProtocol::Plaintext,
+            ssl_ca_location: None,
+            ssl_certificate_location: None,
+            ssl_key_location: None,
+            ssl_key_password: None,
+            ssl_endpoint_identification_algorithm: None,
+            sasl_mechanism: None,
+            sasl_username: None,
+            sasl_password: None
         }
     }
 }
