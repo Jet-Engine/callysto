@@ -5,6 +5,7 @@ pub mod app;
 pub mod definitions;
 pub mod errors;
 pub mod config;
+pub use rdkafka as rdkafka;
 
 pub mod prelude {
     pub use super::kafka::*;
@@ -14,6 +15,7 @@ pub mod prelude {
     pub use super::definitions::*;
     pub use super::errors::*;
     pub use super::config::*;
+    pub use super::rdkafka::*;
 }
 
 #[cfg(test)]

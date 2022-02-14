@@ -1,13 +1,23 @@
-use crate::definitions::*;
-use crate::table::CTable;
-use crate::kafka::{CTopic, BastionRuntime};
-use lever::sync::atomics::AtomicBox;
+use std::default::Default;
 use std::sync::Arc;
-use lever::prelude::{LOTable, HOPTable};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::prelude::{CronJob, Config};
+use bastion::spawn;
+use futures::future::join_all;
+
+use futures::stream::StreamExt;
+use lever::prelude::{HOPTable, LOTable};
+use lever::sync::atomics::AtomicBox;
+use lightproc::prelude::RecoverableHandle;
 use rdkafka::ClientConfig;
-use rdkafka::consumer::{StreamConsumer, Consumer, DefaultConsumerContext};
+use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
+use rdkafka::error::KafkaResult;
+use rdkafka::message::{BorrowedMessage, OwnedMessage};
+use tracing::error;
+
+use crate::definitions::*;
+use crate::kafka::{BastionRuntime, CTopic};
+use crate::prelude::{Config, CronJob};
+use crate::table::CTable;
 
 pub struct Callysto<Store>
 where
@@ -23,6 +33,7 @@ where
     cronjobs: LOTable<usize, Arc<CronJob<Store>>>,
     services: LOTable<usize, Arc<dyn Service<Store>>>,
     agents: LOTable<usize, Arc<dyn Agent<Store>>>,
+    topics: LOTable<usize, CTopic>
 }
 
 impl Callysto<()> {
@@ -53,7 +64,8 @@ where
             timers: LOTable::default(),
             cronjobs: LOTable::default(),
             services: LOTable::default(),
-            agents: LOTable::default()
+            agents: LOTable::default(),
+            topics: LOTable::default()
         }
     }
 
@@ -79,10 +91,11 @@ where
         self
     }
 
-    pub fn agent(&self, s: impl Agent<Store>) -> &Self
+    pub fn agent(&self, topic: CTopic, s: impl Agent<Store>) -> &Self
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.agents.insert(stub, Arc::new(s));
+        self.topics.insert(stub, topic);
         self
     }
 
@@ -124,39 +137,31 @@ where
             .set("group.id", self.app_name.as_str());
 
         // Security settings
-        let cc = cc
+        cc
             .set("security.protocol", format!("{}", self.config.security_protocol));
 
         use crate::enums::SecurityProtocol::*;
         let cc = match self.config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
-                self.build_ssl_context(cc);
-                cc
+                self.build_ssl_context(cc)
             },
             SaslPlaintext => {
                 // Only SASL context build is needed.
-                self.build_sasl_context(cc);
-                cc
+                self.build_sasl_context(cc)
             },
             SaslSsl => {
                 // Build both contexts with available arguments.
-                self.build_sasl_context(cc);
-                self.build_ssl_context(cc);
-                cc
+                let cc = self.build_sasl_context(cc);
+                self.build_ssl_context(cc)
             }
             _ => cc,
         };
 
-
-        let consumer: StreamConsumer<DefaultConsumerContext, BastionRuntime> = cc
-            .create()
-            .expect("Consumer creation failed");
-        consumer.subscribe(&[topic.as_ref()]).unwrap();
-        CTopic::new(consumer)
+        CTopic::new(topic, cc)
     }
 
-    fn build_sasl_context(&self, mut cc: &mut ClientConfig) {
+    fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
         self.config.sasl_mechanism.clone().map(|e| {
             cc.set("sasl.mechanism", format!("{}", e))
         });
@@ -168,9 +173,11 @@ where
         self.config.sasl_password.clone().map(|e| {
             cc.set("sasl.password", e)
         });
+
+        cc
     }
 
-    fn build_ssl_context(&self, mut cc: &mut ClientConfig) {
+    fn build_ssl_context(&self, mut cc: ClientConfig) -> ClientConfig {
         self.config.ssl_certificate_location.clone().map(|e| {
             cc.set("ssl.certificate.location", e)
         });
@@ -190,6 +197,8 @@ where
         self.config.ssl_endpoint_identification_algorithm.clone().map(|e| {
             cc.set("ssl.endpoint.identification.algorithm", format!("{}", e))
         });
+
+        cc
     }
 
     pub fn table(&self) -> CTable {
@@ -198,4 +207,23 @@ where
 
     // TODO: page method to serve
     // TODO: table_route method to give data based on page slug
+
+    pub fn run(self) {
+        let agents: Vec<RecoverableHandle<()>> = self.agents.iter().zip(self.topics.iter()).map(|((aid, agent), (tid, topic))| {
+            // let agent = agent.clone();
+            let storage = self.storage.clone();
+
+            bastion::executor::blocking(async move {
+                let consumer = topic.consumer();
+                loop {
+                    let storage = storage.clone();
+                    let message = consumer.recv().await;
+                    let context = Context::new(storage);
+                    let _slow_drop = agent.call(message, context).await.unwrap();
+                }
+            })
+        }).collect();
+
+        bastion::executor::run(join_all(agents));
+    }
 }

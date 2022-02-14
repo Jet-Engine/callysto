@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use callysto::prelude::*;
+use callysto::prelude::message::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -26,7 +27,7 @@ impl SharedState {
 // }
 
 
-async fn counter_agent(ctx: Context<SharedState>) -> Result<SharedState> {
+async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
     todo!()
 }
 
@@ -37,6 +38,9 @@ fn main() {
         .with_name("basic-app");
 
     // with topic specified
-    let topic = app.topic("example");
-    app.agent(counter_agent);
+    // let topic = app.topic("example");
+    app
+        .agent(app.topic("example"), counter_agent);
+
+    app.run();
 }

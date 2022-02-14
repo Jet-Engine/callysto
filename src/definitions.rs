@@ -3,6 +3,7 @@ use crate::errors::{Result as CResult};
 use crate::kafka::CTopic;
 use std::future::Future;
 use std::sync::Arc;
+use rdkafka::message::OwnedMessage;
 
 #[async_trait]
 pub trait Task<State>: Send + Sync + 'static
@@ -28,10 +29,10 @@ pub trait Agent<State>: Send + Sync + 'static
 where
     State: Clone + Send + Sync + 'static
 {
-    /// Execute the given task with state passed in
-    async fn call(&self, st: Context<State>) -> CResult<State>;
-
-    fn topic(&self) -> CTopic;
+    /// Do work on given message with state passed in
+    async fn call(&self, msg: Option<OwnedMessage>, st: Context<State>) -> CResult<()>;
+    //
+    // fn topic(&self) -> CTopic;
 }
 
 
@@ -53,18 +54,18 @@ impl<State, F, Fut> Task<State> for F
 impl<State, F, Fut> Agent<State> for F
     where
         State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-        Fut: Future<Output = CResult<State>> + Send + 'static,
+        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
 {
-    async fn call(&self, req: Context<State>) -> CResult<State> {
-        let fut = (self)(req);
+    async fn call(&self, msg: Option<OwnedMessage>, req: Context<State>) -> CResult<()> {
+        let fut = (self)(msg, req);
         let res = fut.await?;
         Ok(res.into())
     }
 
-    fn topic(&self) -> CTopic {
-        todo!()
-    }
+    // fn topic(&self) -> CTopic {
+    //     todo!()
+    // }
 }
 
 #[async_trait]
@@ -109,4 +110,15 @@ impl<State> Context<State>
 where
     State: Clone + Send + Sync + 'static
 {
+    pub fn new(state: State) -> Self {
+        Self {state}
+    }
+
+    pub fn state(&self) -> &State {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut State {
+        &mut self.state
+    }
 }
