@@ -74,6 +74,10 @@ impl CTopic {
         }
     }
 
+    pub fn topic_name(&self) -> String {
+        self.topic.clone()
+    }
+
     pub fn consumer(&self) -> CConsumer {
         let consumer: StreamConsumer<_, BastionRuntime> = self.client_config
             .create()

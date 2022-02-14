@@ -12,7 +12,8 @@ use rdkafka::ClientConfig;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
-use tracing::error;
+use tracing::{error, info};
+use tracing_subscriber::{self, fmt, EnvFilter};
 
 use crate::definitions::*;
 use crate::kafka::{BastionRuntime, CTopic};
@@ -127,7 +128,7 @@ where
             .set("enable.auto.offset.store", format!("{}", self.config.enable_auto_offset_store))
             .set("max.poll.interval.ms", format!("{}", self.config.max_poll_interval_ms))
             .set("max.partition.fetch.bytes", format!("{}", self.config.max_partition_fetch_bytes))
-            .set("fetch.max.wait.ms", format!("{}", self.config.fetch_max_wait_ms))
+            .set("fetch.wait.max.ms", format!("{}", self.config.fetch_max_wait_ms))
             .set("request.timeout.ms", format!("{}", self.config.request_timeout_ms))
             .set("check.crcs", format!("{}", self.config.check_crcs))
             .set("session.timeout.ms", format!("{}", self.config.session_timeout_ms))
@@ -209,12 +210,18 @@ where
     // TODO: table_route method to give data based on page slug
 
     pub fn run(self) {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .init();
+
         let agents: Vec<RecoverableHandle<()>> = self.agents.iter().zip(self.topics.iter()).map(|((aid, agent), (tid, topic))| {
             // let agent = agent.clone();
             let storage = self.storage.clone();
+            let consumer_group_name = self.app_name.clone();
 
             bastion::executor::blocking(async move {
                 let consumer = topic.consumer();
+                info!("Started - Consumer Group `{}` - Topic `{}`", consumer_group_name, topic.topic_name());
                 loop {
                     let storage = storage.clone();
                     let message = consumer.recv().await;

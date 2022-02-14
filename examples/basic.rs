@@ -17,28 +17,28 @@ impl SharedState {
     }
 }
 
-// pub struct CounterAgent;
-
-// #[async_trait]
-// impl Agent<State> for CounterAgent {
-//     async fn process(&self, m: st: Context<State>) -> Result<State> {
-//         todo!()
-//     }
-// }
-
-
 async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
-    todo!()
+    // Read the incoming bytes as string
+    msg.map(|m| {
+        let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
+        println!("Received payload: `{}`", strm);
+    });
+
+    // Increment message counter and print it.
+    // Show how you can store a application state.
+    let state = ctx.state();
+    let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
+    println!("Message count: `{}`", msgcount);
+
+    Ok(())
 }
 
 fn main() {
-    let mut app = Callysto::with_storage(SharedState::new());
+    let mut app =
+        Callysto::with_storage(SharedState::new());
 
     app
         .with_name("basic-app");
-
-    // with topic specified
-    // let topic = app.topic("example");
     app
         .agent(app.topic("example"), counter_agent);
 
