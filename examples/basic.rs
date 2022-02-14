@@ -1,8 +1,7 @@
-use async_trait::async_trait;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use callysto::prelude::*;
 use callysto::prelude::message::*;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 
 #[derive(Clone)]
 struct SharedState {
