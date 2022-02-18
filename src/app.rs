@@ -14,33 +14,35 @@ use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
 use tracing::{error, info};
 use tracing_subscriber::{self, fmt, EnvFilter};
+use url::Url;
 
 use crate::definitions::*;
 use crate::kafka::{BastionRuntime, CTopic};
 use crate::prelude::{Config, CronJob};
 use crate::table::CTable;
 
-pub struct Callysto<Store>
+pub struct Callysto<State>
 where
-    Store: 'static
+    State: 'static
 {
     app_name: String,
-    storage: Store,
+    state: State,
+    storage_url: Option<Url>,
     brokers: String,
     config: Config,
     stubs: Arc<AtomicUsize>,
-    tasks: LOTable<usize, Arc<dyn Task<Store>>>,
-    timers: LOTable<usize, Arc<dyn Task<Store>>>,
-    cronjobs: LOTable<usize, Arc<CronJob<Store>>>,
-    services: LOTable<usize, Arc<dyn Service<Store>>>,
-    agents: LOTable<usize, Arc<dyn Agent<Store>>>,
+    tasks: LOTable<usize, Arc<dyn Task<State>>>,
+    timers: LOTable<usize, Arc<dyn Task<State>>>,
+    cronjobs: LOTable<usize, Arc<CronJob<State>>>,
+    services: LOTable<usize, Arc<dyn Service<State>>>,
+    agents: LOTable<usize, Arc<dyn Agent<State>>>,
     topics: LOTable<usize, CTopic>
 }
 
 impl Callysto<()> {
     #[must_use]
     pub fn new() -> Self {
-        Self::with_storage(())
+        Self::with_state(())
     }
 }
 
@@ -50,14 +52,15 @@ impl Default for Callysto<()> {
     }
 }
 
-impl<Store> Callysto<Store>
+impl<State> Callysto<State>
 where
-    Store: Clone + Send + Sync + 'static
+    State: Clone + Send + Sync + 'static
 {
-    pub fn with_storage(storage: Store) -> Self {
+    pub fn with_state(state: State) -> Self {
         Self {
             app_name: "callysto-app".to_owned(),
-            storage,
+            state,
+            storage_url: None,
             stubs: Arc::new(AtomicUsize::default()),
             brokers: "localhost:9092".to_owned(),
             config: Config::default(),
@@ -70,6 +73,17 @@ where
         }
     }
 
+    pub fn with_storage<T>(&mut self, url: T) -> &mut Self
+    where
+        T: AsRef<str>
+    {
+
+        let url = Url::parse(url.as_ref())
+            .expect("Storage backend url parsing failed.");
+        self.storage_url = Some(url);
+        self
+    }
+
     pub fn with_name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
         self.app_name = name.as_ref().to_string();
         self
@@ -80,19 +94,19 @@ where
         self
     }
 
-    pub fn task(&self, t: impl Task<Store>) -> &Self {
+    pub fn task(&self, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.tasks.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn timer(&self, t: impl Task<Store>) -> &Self {
+    pub fn timer(&self, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.timers.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn agent(&self, topic: CTopic, s: impl Agent<Store>) -> &Self
+    pub fn agent(&self, topic: CTopic, s: impl Agent<State>) -> &Self
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.agents.insert(stub, Arc::new(s));
@@ -100,13 +114,13 @@ where
         self
     }
 
-    pub fn service(&self, s: impl Service<Store>) -> &Self {
+    pub fn service(&self, s: impl Service<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
         self
     }
 
-    pub fn crontab<C: AsRef<str>>(&self, cron_expr: C, t: impl Task<Store>) -> &Self {
+    pub fn crontab<C: AsRef<str>>(&self, cron_expr: C, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let cron_job = Arc::new(CronJob::new(cron_expr, t));
         self.cronjobs.insert(stub, cron_job);
@@ -216,16 +230,16 @@ where
 
         let agents: Vec<RecoverableHandle<()>> = self.agents.iter().zip(self.topics.iter()).map(|((aid, agent), (tid, topic))| {
             // let agent = agent.clone();
-            let storage = self.storage.clone();
+            let state = self.state.clone();
             let consumer_group_name = self.app_name.clone();
 
             bastion::executor::blocking(async move {
                 let consumer = topic.consumer();
                 info!("Started - Consumer Group `{}` - Topic `{}`", consumer_group_name, topic.topic_name());
                 loop {
-                    let storage = storage.clone();
+                    let state = state.clone();
                     let message = consumer.recv().await;
-                    let context = Context::new(storage);
+                    let context = Context::new(state);
                     let _slow_drop = agent.call(message, context).await.unwrap();
                 }
             })

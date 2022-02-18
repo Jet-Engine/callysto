@@ -34,10 +34,11 @@ async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> 
 
 fn main() {
     let mut app =
-        Callysto::with_storage(SharedState::new());
+        Callysto::with_state(SharedState::new());
 
     app
-        .with_name("basic-app");
+        .with_name("basic-app")
+        .with_storage("memory://database");
     app
         .agent(app.topic("example"), counter_agent);
 

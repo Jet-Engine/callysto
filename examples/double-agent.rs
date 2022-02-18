@@ -72,7 +72,7 @@ async fn counter_agent_2(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
 
 fn main() {
     let mut app =
-        Callysto::with_storage(SharedState::new());
+        Callysto::with_state(SharedState::new());
 
     app
         .with_name("double-agent");
