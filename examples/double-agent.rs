@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use callysto::prelude::*;
 use callysto::prelude::message::*;
 
@@ -20,14 +21,24 @@ async fn counter_agent_1(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
     // Read the incoming bytes as string
     msg.map(|m| {
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
-        println!("Received payload from Agent 1: `{}`", strm);
+        // println!("Received payload from Agent 1: `{}`", strm);
     });
 
     // Increment message counter and print it.
     // Show how you can store a application state.
     let state = ctx.state();
     let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
-    println!("Message count: `{}`", msgcount);
+    if msgcount == 0 {
+        let now = SystemTime::now();
+        let du = now.duration_since(UNIX_EPOCH).unwrap();
+        println!("Start time in millis: {}", du.as_millis());
+    }
+    if msgcount == 199_999 {
+        let now = SystemTime::now();
+        let du = now.duration_since(UNIX_EPOCH).unwrap();
+        println!("End time in millis: {}", du.as_millis());
+    }
+    // println!("Message count: `{}`", msgcount);
 
     Ok(())
 }
@@ -36,14 +47,24 @@ async fn counter_agent_2(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
     // Read the incoming bytes as string
     msg.map(|m| {
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
-        println!("Received payload from Agent 2: `{}`", strm);
+        // println!("Received payload from Agent 2: `{}`", strm);
     });
 
     // Increment message counter and print it.
     // Show how you can store a application state.
     let state = ctx.state();
     let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
-    println!("Message count: `{}`", msgcount);
+    if msgcount == 0 {
+        let now = SystemTime::now();
+        let du = now.duration_since(UNIX_EPOCH).unwrap();
+        println!("Start time in millis: {}", du.as_millis());
+    }
+    if msgcount == 199_999 {
+        let now = SystemTime::now();
+        let du = now.duration_since(UNIX_EPOCH).unwrap();
+        println!("End time in millis: {}", du.as_millis());
+    }
+    // println!("Message count: `{}`", msgcount);
 
     Ok(())
 }

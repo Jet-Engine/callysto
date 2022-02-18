@@ -21,6 +21,26 @@ pub trait Service<State>: Send + Sync + 'static
 {
     /// Execute the given task with state passed in
     async fn call(&self, st: Context<State>) -> CResult<State>;
+
+    async fn start(&self);
+
+    async fn restart(&self);
+
+    async fn crash(&self);
+
+    async fn stop(&self);
+
+    async fn wait_until_stopped(&self);
+
+    async fn started(&self) -> bool;
+
+    async fn crashed(&self) -> bool;
+
+    async fn state(&self) -> String;
+
+    async fn label(&self) -> String;
+
+    async fn shortlabel(&self) -> String;
 }
 
 

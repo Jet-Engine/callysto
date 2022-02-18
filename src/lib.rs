@@ -5,6 +5,9 @@ pub mod app;
 pub mod definitions;
 pub mod errors;
 pub mod config;
+
+mod stores;
+
 pub use rdkafka as rdkafka;
 
 pub mod prelude {
