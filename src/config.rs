@@ -1,5 +1,4 @@
-use crate::{enums::{EndpointIdentificationAlgorithm, OffsetReset, ProcessingGuarantee}, prelude::{IsolationLevel, SecurityProtocol}};
-use crate::enums::{SaslMechanism};
+use crate::kafka::enums::*;
 
 pub struct Config {
     ///

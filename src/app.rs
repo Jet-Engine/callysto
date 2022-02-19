@@ -1,10 +1,9 @@
 use std::default::Default;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
 use bastion::spawn;
 use futures::future::join_all;
-
-use futures::stream::StreamExt;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
@@ -13,12 +12,13 @@ use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamC
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
 use tracing::{error, info};
-use tracing_subscriber::{self, fmt, EnvFilter};
+use tracing_subscriber::{self, EnvFilter, fmt};
 use url::Url;
 
 use crate::definitions::*;
-use crate::kafka::{BastionRuntime, CTopic};
+use crate::kafka::{ctopic::*, runtime::BastionRuntime};
 use crate::prelude::{Config, CronJob};
+use crate::service::Service;
 use crate::table::CTable;
 
 pub struct Callysto<State>
@@ -155,7 +155,7 @@ where
         cc
             .set("security.protocol", format!("{}", self.config.security_protocol));
 
-        use crate::enums::SecurityProtocol::*;
+        use crate::kafka::enums::SecurityProtocol::*;
         let cc = match self.config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
