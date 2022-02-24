@@ -1,16 +1,15 @@
 use async_trait::*;
-use crate::errors::{Result as CResult};
+use crate::errors::*;
 use crate::kafka::ctopic::*;
 use std::future::Future;
-use std::io::Read;
 use std::sync::Arc;
 use futures::future::TryFutureExt;
-use rdkafka::message::OwnedMessage;
 use crate::definitions::Context;
 use crate::errors::*;
 
 ///
 /// Possible states that services can be in.
+#[derive(Copy, Clone)]
 pub enum ServiceState {
     PreStart,
     Running,
@@ -25,7 +24,7 @@ pub trait Service<State>: Send + Sync + 'static
         State: Clone + Send + Sync + 'static
 {
     /// Execute the given task with state passed in
-    async fn call(&self, st: Context<State>) -> CResult<State>;
+    async fn call(&self, st: Context<State>) -> Result<State>;
 
     async fn start(&self) -> Result<()>;
 
@@ -48,7 +47,7 @@ pub trait Service<State>: Send + Sync + 'static
     async fn shortlabel(&self) -> String;
 
     // Provider methods
-    async fn service_state(&self) -> ServiceState;
+    async fn service_state(&self) -> Arc<ServiceState>;
 }
 
 #[async_trait]
@@ -56,9 +55,9 @@ impl<State, F, Fut> Service<State> for F
     where
         State: Clone + Send + Sync + 'static,
         F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-        Fut: Future<Output = CResult<State>> + Send + 'static,
+        Fut: Future<Output = Result<State>> + Send + 'static,
 {
-    async fn call(&self, req: Context<State>) -> CResult<State> {
+    async fn call(&self, req: Context<State>) -> Result<State> {
         let fut = (self)(req);
         let res = fut.await?;
         Ok(res.into())
@@ -84,8 +83,8 @@ impl<State, F, Fut> Service<State> for F
         let _ = self.stop().await;
     }
 
-    async fn service_state(&self) -> ServiceState {
-        unimplemented!()
+    async fn service_state(&self) -> Arc<ServiceState> {
+        unimplemented!("Service state needs to be implemented")
     }
 
     async fn started(&self) -> bool {

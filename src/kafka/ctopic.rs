@@ -50,3 +50,10 @@ impl CTopic {
         }
     }
 }
+
+///
+/// Topic - Partition tuple
+pub struct CTP {
+    pub topic: String,
+    pub partition: usize
+}
