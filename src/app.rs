@@ -1,18 +1,18 @@
 use std::default::Default;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use bastion::spawn;
 use futures::future::join_all;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
-use rdkafka::ClientConfig;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
+use rdkafka::ClientConfig;
 use tracing::{error, info};
-use tracing_subscriber::{self, EnvFilter, fmt};
+use tracing_subscriber::{self, fmt, EnvFilter};
 use url::Url;
 
 use crate::definitions::*;
@@ -23,7 +23,7 @@ use crate::table::CTable;
 
 pub struct Callysto<State>
 where
-    State: 'static
+    State: 'static,
 {
     app_name: String,
     state: State,
@@ -36,7 +36,7 @@ where
     cronjobs: LOTable<usize, Arc<CronJob<State>>>,
     services: LOTable<usize, Arc<dyn Service<State>>>,
     agents: LOTable<usize, Arc<dyn Agent<State>>>,
-    topics: LOTable<usize, CTopic>
+    topics: LOTable<usize, CTopic>,
 }
 
 impl Callysto<()> {
@@ -54,7 +54,7 @@ impl Default for Callysto<()> {
 
 impl<State> Callysto<State>
 where
-    State: Clone + Send + Sync + 'static
+    State: Clone + Send + Sync + 'static,
 {
     pub fn with_state(state: State) -> Self {
         Self {
@@ -69,17 +69,15 @@ where
             cronjobs: LOTable::default(),
             services: LOTable::default(),
             agents: LOTable::default(),
-            topics: LOTable::default()
+            topics: LOTable::default(),
         }
     }
 
     pub fn with_storage<T>(&mut self, url: T) -> &mut Self
     where
-        T: AsRef<str>
+        T: AsRef<str>,
     {
-
-        let url = Url::parse(url.as_ref())
-            .expect("Storage backend url parsing failed.");
+        let url = Url::parse(url.as_ref()).expect("Storage backend url parsing failed.");
         self.storage_url = Some(url);
         self
     }
@@ -106,8 +104,7 @@ where
         self
     }
 
-    pub fn agent(&self, topic: CTopic, s: impl Agent<State>) -> &Self
-    {
+    pub fn agent(&self, topic: CTopic, s: impl Agent<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.agents.insert(stub, Arc::new(s));
         self.topics.insert(stub, topic);
@@ -129,42 +126,75 @@ where
 
     pub fn topic<T>(&self, topic: T) -> CTopic
     where
-        T: AsRef<str>
+        T: AsRef<str>,
     {
-
         let mut cc = ClientConfig::new();
 
-        cc
-            .set("bootstrap.servers", &*self.brokers)
-            .set("enable.auto.commit", format!("{}", self.config.enable_auto_commit))
-            .set("auto.offset.reset", format!("{}", self.config.auto_offset_reset))
-            .set("auto.commit.interval.ms", format!("{}", self.config.auto_commit_interval_ms))
-            .set("enable.auto.offset.store", format!("{}", self.config.enable_auto_offset_store))
-            .set("max.poll.interval.ms", format!("{}", self.config.max_poll_interval_ms))
-            .set("max.partition.fetch.bytes", format!("{}", self.config.max_partition_fetch_bytes))
-            .set("fetch.wait.max.ms", format!("{}", self.config.fetch_max_wait_ms))
-            .set("request.timeout.ms", format!("{}", self.config.request_timeout_ms))
+        cc.set("bootstrap.servers", &*self.brokers)
+            .set(
+                "enable.auto.commit",
+                format!("{}", self.config.enable_auto_commit),
+            )
+            .set(
+                "auto.offset.reset",
+                format!("{}", self.config.auto_offset_reset),
+            )
+            .set(
+                "auto.commit.interval.ms",
+                format!("{}", self.config.auto_commit_interval_ms),
+            )
+            .set(
+                "enable.auto.offset.store",
+                format!("{}", self.config.enable_auto_offset_store),
+            )
+            .set(
+                "max.poll.interval.ms",
+                format!("{}", self.config.max_poll_interval_ms),
+            )
+            .set(
+                "max.partition.fetch.bytes",
+                format!("{}", self.config.max_partition_fetch_bytes),
+            )
+            .set(
+                "fetch.wait.max.ms",
+                format!("{}", self.config.fetch_max_wait_ms),
+            )
+            .set(
+                "request.timeout.ms",
+                format!("{}", self.config.request_timeout_ms),
+            )
             .set("check.crcs", format!("{}", self.config.check_crcs))
-            .set("session.timeout.ms", format!("{}", self.config.session_timeout_ms))
-            .set("heartbeat.interval.ms", format!("{}", self.config.heartbeat_interval_ms))
-            .set("isolation.level", format!("{}", self.config.isolation_level))
+            .set(
+                "session.timeout.ms",
+                format!("{}", self.config.session_timeout_ms),
+            )
+            .set(
+                "heartbeat.interval.ms",
+                format!("{}", self.config.heartbeat_interval_ms),
+            )
+            .set(
+                "isolation.level",
+                format!("{}", self.config.isolation_level),
+            )
             // Consumer group ID
             .set("group.id", self.app_name.as_str());
 
         // Security settings
-        cc
-            .set("security.protocol", format!("{}", self.config.security_protocol));
+        cc.set(
+            "security.protocol",
+            format!("{}", self.config.security_protocol),
+        );
 
         use crate::kafka::enums::SecurityProtocol::*;
         let cc = match self.config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
                 self.build_ssl_context(cc)
-            },
+            }
             SaslPlaintext => {
                 // Only SASL context build is needed.
                 self.build_sasl_context(cc)
-            },
+            }
             SaslSsl => {
                 // Build both contexts with available arguments.
                 let cc = self.build_sasl_context(cc);
@@ -177,41 +207,49 @@ where
     }
 
     fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
-        self.config.sasl_mechanism.clone().map(|e| {
-            cc.set("sasl.mechanism", format!("{}", e))
-        });
+        self.config
+            .sasl_mechanism
+            .clone()
+            .map(|e| cc.set("sasl.mechanism", format!("{}", e)));
 
-        self.config.sasl_username.clone().map(|e| {
-            cc.set("sasl.username", e)
-        });
+        self.config
+            .sasl_username
+            .clone()
+            .map(|e| cc.set("sasl.username", e));
 
-        self.config.sasl_password.clone().map(|e| {
-            cc.set("sasl.password", e)
-        });
+        self.config
+            .sasl_password
+            .clone()
+            .map(|e| cc.set("sasl.password", e));
 
         cc
     }
 
     fn build_ssl_context(&self, mut cc: ClientConfig) -> ClientConfig {
-        self.config.ssl_certificate_location.clone().map(|e| {
-            cc.set("ssl.certificate.location", e)
-        });
+        self.config
+            .ssl_certificate_location
+            .clone()
+            .map(|e| cc.set("ssl.certificate.location", e));
 
-        self.config.ssl_ca_location.clone().map(|e| {
-            cc.set("ssl.ca.location", e)
-        });
+        self.config
+            .ssl_ca_location
+            .clone()
+            .map(|e| cc.set("ssl.ca.location", e));
 
-        self.config.ssl_key_location.clone().map(|e| {
-            cc.set("ssl.key.location", e)
-        });
+        self.config
+            .ssl_key_location
+            .clone()
+            .map(|e| cc.set("ssl.key.location", e));
 
-        self.config.ssl_key_password.clone().map(|e| {
-            cc.set("ssl.key.password", e)
-        });
+        self.config
+            .ssl_key_password
+            .clone()
+            .map(|e| cc.set("ssl.key.password", e));
 
-        self.config.ssl_endpoint_identification_algorithm.clone().map(|e| {
-            cc.set("ssl.endpoint.identification.algorithm", format!("{}", e))
-        });
+        self.config
+            .ssl_endpoint_identification_algorithm
+            .clone()
+            .map(|e| cc.set("ssl.endpoint.identification.algorithm", format!("{}", e)));
 
         cc
     }
@@ -228,22 +266,30 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let agents: Vec<RecoverableHandle<()>> = self.agents.iter().zip(self.topics.iter()).map(|((aid, agent), (tid, topic))| {
-            // let agent = agent.clone();
-            let state = self.state.clone();
-            let consumer_group_name = self.app_name.clone();
+        let agents: Vec<RecoverableHandle<()>> = self
+            .agents
+            .iter()
+            .zip(self.topics.iter())
+            .map(|((_aid, agent), (_tid, topic))| {
+                let state = self.state.clone();
+                let consumer_group_name = self.app_name.clone();
 
-            bastion::executor::blocking(async move {
-                let consumer = topic.consumer();
-                info!("Started - Consumer Group `{}` - Topic `{}`", consumer_group_name, topic.topic_name());
-                loop {
-                    let state = state.clone();
-                    let message = consumer.recv().await;
-                    let context = Context::new(state);
-                    let _slow_drop = agent.call(message, context).await.unwrap();
-                }
+                bastion::executor::blocking(async move {
+                    let consumer = topic.consumer();
+                    info!(
+                        "Started - Consumer Group `{}` - Topic `{}`",
+                        consumer_group_name,
+                        topic.topic_name()
+                    );
+                    loop {
+                        let state = state.clone();
+                        let message = consumer.recv().await;
+                        let context = Context::new(state);
+                        let _slow_drop = agent.call(message, context).await.unwrap();
+                    }
+                })
             })
-        }).collect();
+            .collect();
 
         bastion::executor::run(join_all(agents));
     }

@@ -1,11 +1,11 @@
-use async_trait::*;
-use crate::errors::*;
-use crate::kafka::ctopic::*;
-use std::future::Future;
-use std::sync::Arc;
-use futures::future::TryFutureExt;
 use crate::definitions::Context;
 use crate::errors::*;
+use crate::errors::*;
+use crate::kafka::ctopic::*;
+use async_trait::*;
+use futures::future::TryFutureExt;
+use std::future::Future;
+use std::sync::Arc;
 
 ///
 /// Possible states that services can be in.
@@ -15,13 +15,13 @@ pub enum ServiceState {
     Running,
     Stopped,
     Restarting,
-    Crashed
+    Crashed,
 }
 
 #[async_trait]
 pub trait Service<State>: Send + Sync + 'static
-    where
-        State: Clone + Send + Sync + 'static
+where
+    State: Clone + Send + Sync + 'static,
 {
     /// Execute the given task with state passed in
     async fn call(&self, st: Context<State>) -> Result<State>;
@@ -52,10 +52,10 @@ pub trait Service<State>: Send + Sync + 'static
 
 #[async_trait]
 impl<State, F, Fut> Service<State> for F
-    where
-        State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-        Fut: Future<Output = Result<State>> + Send + 'static,
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = Result<State>> + Send + 'static,
 {
     async fn call(&self, req: Context<State>) -> Result<State> {
         let fut = (self)(req);

@@ -35,7 +35,8 @@ async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> 
 fn main() {
     let mut app = Callysto::with_state(SharedState::new());
 
-    app.with_name("basic-app");
+    app.with_name("basic-app")
+        .with_storage("memory:///home/theo/projects/callysto");
     app.agent(app.topic("example"), counter_agent);
 
     app.run();

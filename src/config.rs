@@ -49,29 +49,28 @@ pub struct Config {
     pub request_timeout_ms: usize,
 
     ///
-    /// The expected time in milliseconds between heartbeats to the consumer coordinator when 
-    /// using Kafka’s group management feature. Heartbeats are used to ensure that the consumer’s 
-    /// session stays active and to facilitate rebalancing when new consumers join or 
-    /// leave the group. 
-    /// 
-    /// The value must be set lower than `session_timeout_ms`, but typically should be set no 
-    /// higher than 1/3 of that value. It can be adjusted even lower to control the expected 
+    /// The expected time in milliseconds between heartbeats to the consumer coordinator when
+    /// using Kafka’s group management feature. Heartbeats are used to ensure that the consumer’s
+    /// session stays active and to facilitate rebalancing when new consumers join or
+    /// leave the group.
+    ///
+    /// The value must be set lower than `session_timeout_ms`, but typically should be set no
+    /// higher than 1/3 of that value. It can be adjusted even lower to control the expected
     /// time for normal rebalances.
     pub heartbeat_interval_ms: usize,
 
     ///
     /// Controls how to read messages written transactionally:
-    /// 
+    ///
     /// * `read_committed` - only return transactional messages which have been committed.
     /// * `read_uncommitted` - return all messages, even transactional messages which have been aborted.
     pub isolation_level: IsolationLevel,
 
     ///
-    /// Alias for `fetch.message.max.bytes`: Initial maximum number of bytes per topic+partition 
-    /// to request when fetching messages from the broker. If the client encounters a message larger 
+    /// Alias for `fetch.message.max.bytes`: Initial maximum number of bytes per topic+partition
+    /// to request when fetching messages from the broker. If the client encounters a message larger
     /// than this value it will gradually try to increase it until the entire message can be fetched.
     pub max_partition_fetch_bytes: usize,
-
 
     ///
     /// The maximum amount of time the server will block before answering the fetch request if there isn't
@@ -79,8 +78,8 @@ pub struct Config {
     pub fetch_max_wait_ms: usize,
 
     ///
-    /// Automatically check the CRC32 of the records consumed. This ensures no on-the-wire or on-disk corruption 
-    /// to the messages occurred. This check adds some overhead, so it may be disabled in cases seeking 
+    /// Automatically check the CRC32 of the records consumed. This ensures no on-the-wire or on-disk corruption
+    /// to the messages occurred. This check adds some overhead, so it may be disabled in cases seeking
     /// extreme performance.
     pub check_crcs: bool,
 
@@ -114,7 +113,7 @@ pub struct Config {
     /// SASL Username
     pub sasl_username: Option<String>,
     /// SASL Password
-    pub sasl_password: Option<String>
+    pub sasl_password: Option<String>,
 }
 
 impl Config {
@@ -148,7 +147,7 @@ impl Default for Config {
             ssl_endpoint_identification_algorithm: None,
             sasl_mechanism: None,
             sasl_username: None,
-            sasl_password: None
+            sasl_password: None,
         }
     }
 }

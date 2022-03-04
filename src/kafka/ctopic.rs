@@ -7,31 +7,30 @@ use std::time::Duration;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_timer::Delay;
-use rdkafka::ClientConfig;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
 use rdkafka::util::AsyncRuntime;
+use rdkafka::ClientConfig;
 use tracing::error;
 
 use crate::kafka::cconsumer::CConsumer;
 use crate::kafka::runtime::BastionRuntime;
 
 #[derive(Clone)]
-pub struct CTopic
-{
+pub struct CTopic {
     topic: String,
-    client_config: ClientConfig
+    client_config: ClientConfig,
 }
 
 impl CTopic {
     pub fn new<T>(topic: T, client_config: ClientConfig) -> Self
-        where
-            T: AsRef<str>
+    where
+        T: AsRef<str>,
     {
         Self {
             topic: topic.as_ref().to_owned(),
-            client_config
+            client_config,
         }
     }
 
@@ -40,14 +39,13 @@ impl CTopic {
     }
 
     pub fn consumer(&self) -> CConsumer {
-        let consumer: StreamConsumer<_, BastionRuntime> = self.client_config
+        let consumer: StreamConsumer<_, BastionRuntime> = self
+            .client_config
             .create()
             .expect("Consumer creation failed");
         consumer.subscribe(&[&self.topic]).unwrap();
 
-        CConsumer {
-            consumer
-        }
+        CConsumer { consumer }
     }
 }
 
@@ -55,5 +53,5 @@ impl CTopic {
 /// Topic - Partition tuple
 pub struct CTP {
     pub topic: String,
-    pub partition: usize
+    pub partition: usize,
 }

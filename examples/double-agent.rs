@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
-use callysto::prelude::*;
 use callysto::prelude::message::*;
+use callysto::prelude::*;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
 struct SharedState {
@@ -69,17 +69,12 @@ async fn counter_agent_2(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
     Ok(())
 }
 
-
 fn main() {
-    let mut app =
-        Callysto::with_state(SharedState::new());
+    let mut app = Callysto::with_state(SharedState::new());
 
-    app
-        .with_name("double-agent");
-    app
-        .agent(app.topic("double-agent-1"), counter_agent_1)
+    app.with_name("double-agent");
+    app.agent(app.topic("double-agent-1"), counter_agent_1)
         .agent(app.topic("double-agent-2"), counter_agent_2);
-
 
     app.run();
 }

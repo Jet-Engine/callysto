@@ -1,2 +1,2 @@
-mod stores;
 mod rocksdb;
+mod stores;

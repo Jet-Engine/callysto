@@ -1,0 +1,4 @@
+rustflags = [
+    "-C", "linker=clang-gold", "-C", "link-arg=-fuse-ld=gold", "-C", "target-cpu=native"
+]
+# cascadelake.
