@@ -9,9 +9,9 @@ pub trait Store<State>: Service<State>
 where
     State: Clone + Send + Sync + 'static,
 {
-    fn persisted_offset(&self, tp: CTP) -> Option<usize>;
+    fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>>;
 
-    fn set_persisted_offset(&mut self, tp: CTP, offset: usize) -> Result<()>;
+    fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()>;
 
     fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()>;
 

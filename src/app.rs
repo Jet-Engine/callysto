@@ -254,7 +254,7 @@ where
         cc
     }
 
-    pub fn table(&self) -> CTable {
+    pub fn table(&self, table_name: String) -> CTable {
         todo!()
     }
 

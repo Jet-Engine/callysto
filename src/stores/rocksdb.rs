@@ -1,3 +1,5 @@
+use std::cmp::max;
+use std::collections::HashMap;
 use crate::definitions::Context;
 use crate::errors::Result;
 use crate::kafka::ctopic::CTP;
@@ -8,11 +10,12 @@ use futures::future::TryFutureExt;
 use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
-use rocksdb::{BlockBasedOptions, Cache, DBPath, Options as DBOptions, DB};
-use std::convert::TryFrom;
+use rocksdb::{BlockBasedOptions, Cache, DBPath, Options as DBOptions, DB, WriteBatch};
+use std::convert::{identity, TryFrom, TryInto};
 use std::ffi::CString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use rdkafka::Message;
 use url::Url;
 
 const DEFAULT_WRITE_BUFFER_SIZE: usize = (1_usize << 6) * 1024 * 1024; // 64 MB
@@ -22,6 +25,9 @@ const DEFAULT_BLOCK_CACHE_SIZE: usize = 2 * (1_usize << 10).pow(3);
 const DEFAULT_BLOCK_CACHE_COMPRESSED_SIZE: usize = 500 * (1_usize << 10).pow(2);
 const DEFAULT_BLOOM_FILTER_SIZE: u64 = 3;
 const DEFAULT_MAX_BYTES_FOR_LEVEL_BASE: u64 = 1 << 8;
+
+const CALLYSTO_OFFSET_KEY: &[u8; 19] = b"__callysto\0offset__";
+
 
 #[inline]
 fn get_rlimit_max() -> u64 {
@@ -73,22 +79,24 @@ pub(super) fn get_db_level_free_limit<T>(p: T) -> u64
 where
     T: AsRef<Path>,
 {
-    let freel = get_statvfs_bavail_frsize(p);
-    (freel as f64 * 0.3).ceil() as _
+    let free = get_statvfs_bavail_frsize(p);
+    (free as f64 * 0.3).ceil() as _
 }
 
 #[derive(Clone)]
 pub struct RocksDbStore {
     storage_url: Url,
+    table_name: String,
     service_state: Arc<AtomicBox<ServiceState>>,
     dbs: LOTable<usize, Arc<DB>>,
     db_options: DBOptions,
 }
 
 impl RocksDbStore {
-    pub fn new(storage_url: Url) -> Self {
+    pub fn new(storage_url: Url, table_name: String) -> Self {
         let mut rds = Self {
             storage_url,
+            table_name,
             service_state: Arc::new(AtomicBox::new(ServiceState::PreStart)),
             dbs: LOTable::default(),
             db_options: DBOptions::default(),
@@ -125,21 +133,30 @@ impl RocksDbStore {
         self.db_options = opts;
     }
 
-    fn open(&self, partition_path: String) -> DB {
+    fn open_for_partition(&self, partition: usize) -> DB {
         // TODO: Hint for SST files
         // let dbpath = DBPath::new(
         //     self.storage_url.path(),
         //     get_db_level_free_limit(self.storage_url.path()),
         // ).unwrap();
-        DB::open(&self.db_options, self.storage_url.path()).unwrap()
+        let partition_path = self.partition_path(partition);
+        DB::open(&self.db_options, partition_path).unwrap()
     }
 
-    fn partition_path(partition: usize) -> String {
-        todo!()
+    fn partition_path(&self, partition: usize) -> String {
+        PathBuf::from(self.storage_url.path())
+            .join(format!("{}-{}.db", self.table_name, partition))
+            .into_os_string()
+            .into_string()
+            .unwrap()
     }
 
-    fn open_for_partition(&self, partition: usize) -> DB {
-        todo!()
+    fn db_for_partition(&self, partition: usize) -> Arc<DB> {
+        self.dbs.get(&partition).unwrap_or_else(|| {
+            let db = Arc::new(self.open_for_partition(partition));
+            let _ = self.dbs.insert(partition, db.clone());
+            db
+        })
     }
 }
 
@@ -204,19 +221,65 @@ impl<State> Store<State> for RocksDbStore
 where
     State: Clone + Send + Sync + 'static,
 {
-    fn persisted_offset(&self, tp: CTP) -> Option<usize> {
-        todo!()
+    fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {
+        let offset =
+            self.db_for_partition(tp.partition).get(CALLYSTO_OFFSET_KEY)?
+                .map_or(None, |e| Option::from(usize::from_ne_bytes(e.as_slice().try_into().unwrap())));
+        Ok(offset)
     }
 
-    fn set_persisted_offset(&mut self, tp: CTP, offset: usize) -> crate::errors::Result<()> {
-        todo!()
+    fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()> {
+        Ok(self.db_for_partition(tp.partition).put(CALLYSTO_OFFSET_KEY, offset.to_string())?)
     }
 
-    fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> crate::errors::Result<()> {
-        todo!()
+    fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()> {
+        let mut write_batches: HashMap<usize, WriteBatch> = HashMap::with_capacity(10);
+        let mut tp_offsets: HashMap<CTP, usize> = HashMap::with_capacity(events.len());
+        events.iter().for_each(|e| {
+            let tp = CTP::new(e.topic().into(), e.partition() as _);
+            let offset: usize = e.offset() as _;
+            tp_offsets.entry(tp)
+                .and_modify(|o| *o = offset.max(*o))
+                .or_insert(offset);
+
+            match e.payload() {
+                Some(p) => {
+                    write_batches.entry(e.partition() as _)
+                        .and_modify(|wb| {
+                            wb.put(e.key().unwrap(), p);
+                        })
+                        .or_insert_with(|| {
+                            let mut wb = WriteBatch::default();
+                            wb.put(e.key().unwrap(), p);
+                            wb
+                        });
+                },
+                _ => {
+                    write_batches.entry(e.partition() as _)
+                        .and_modify(|wb| {
+                            wb.delete(e.key().unwrap());
+                        })
+                        .or_insert_with(|| {
+                            let mut wb = WriteBatch::default();
+                            wb.delete(e.key().unwrap());
+                            wb
+                        });
+                }
+            }
+        });
+
+        write_batches.into_iter().try_for_each(|(partition, batch)| {
+            self.db_for_partition(partition).write(batch)
+        })?;
+
+        tp_offsets.into_iter().try_for_each(|(tp, offset)| {
+            <Self as Store<State>>::set_persisted_offset(self, tp, offset)
+        })?;
+
+        Ok(())
     }
 
-    fn reset_state(&self) -> crate::errors::Result<()> {
+    fn reset_state(&self) -> Result<()> {
         todo!()
     }
 
@@ -226,7 +289,7 @@ where
         revoked: Vec<CTP>,
         newly_assigned: Vec<CTP>,
         generation_id: usize,
-    ) -> crate::errors::Result<()> {
+    ) -> Result<()> {
         todo!()
     }
 
@@ -234,7 +297,7 @@ where
         &self,
         active_tps: Vec<CTP>,
         standby_tps: Vec<CTP>,
-    ) -> crate::errors::Result<()> {
+    ) -> Result<()> {
         todo!()
     }
 }

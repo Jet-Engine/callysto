@@ -51,7 +51,14 @@ impl CTopic {
 
 ///
 /// Topic - Partition tuple
+#[derive(Eq, PartialEq, Hash)]
 pub struct CTP {
     pub topic: String,
     pub partition: usize,
+}
+
+impl CTP {
+    pub fn new(topic: String, partition: usize) -> Self {
+        Self {topic, partition}
+    }
 }

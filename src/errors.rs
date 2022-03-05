@@ -7,4 +7,7 @@ pub type Result<T> = result::Result<T, CallystoError>;
 pub enum CallystoError {
     #[error("Failed to parse the configuration from env: `{0}`")]
     InvalidConfig(String),
+
+    #[error("RocksDB Error")]
+    RocksDBError(#[from] rocksdb::Error),
 }
