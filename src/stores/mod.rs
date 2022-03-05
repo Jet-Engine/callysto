@@ -1,2 +1,2 @@
 mod rocksdb;
-mod stores;
+pub(crate) mod store;

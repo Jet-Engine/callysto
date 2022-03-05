@@ -1,21 +1,32 @@
-use std::cmp::max;
-use std::collections::HashMap;
 use crate::definitions::Context;
-use crate::errors::Result;
+use crate::errors::{CallystoError, Result};
 use crate::kafka::ctopic::CTP;
 use crate::service::{Service, ServiceState};
-use crate::stores::stores::Store;
+use crate::stores::store::Store;
+use crate::table::Collection;
 use async_trait::*;
 use futures::future::TryFutureExt;
+use futures_timer::Delay;
 use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
+use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
-use rocksdb::{BlockBasedOptions, Cache, DBPath, Options as DBOptions, DB, WriteBatch};
+use rdkafka::Message;
+use rocksdb::{
+    BlockBasedOptions, Cache, DBPath, DBWithThreadMode, Error, Options as DBOptions,
+    SingleThreaded, WriteBatch, DB,
+};
+use std::cmp::max;
+use std::collections::{HashMap, HashSet};
 use std::convert::{identity, TryFrom, TryInto};
 use std::ffi::CString;
+use std::hint::unreachable_unchecked;
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use rdkafka::Message;
+use std::time::Duration;
+use tracing::{info, warn};
 use url::Url;
 
 const DEFAULT_WRITE_BUFFER_SIZE: usize = (1_usize << 6) * 1024 * 1024; // 64 MB
@@ -27,7 +38,6 @@ const DEFAULT_BLOOM_FILTER_SIZE: u64 = 3;
 const DEFAULT_MAX_BYTES_FOR_LEVEL_BASE: u64 = 1 << 8;
 
 const CALLYSTO_OFFSET_KEY: &[u8; 19] = b"__callysto\0offset__";
-
 
 #[inline]
 fn get_rlimit_max() -> u64 {
@@ -86,6 +96,7 @@ where
 #[derive(Clone)]
 pub struct RocksDbStore {
     storage_url: Url,
+    rebalance_ack: Arc<AtomicBool>,
     table_name: String,
     service_state: Arc<AtomicBox<ServiceState>>,
     dbs: LOTable<usize, Arc<DB>>,
@@ -96,6 +107,7 @@ impl RocksDbStore {
     pub fn new(storage_url: Url, table_name: String) -> Self {
         let mut rds = Self {
             storage_url,
+            rebalance_ack: Arc::new(AtomicBool::default()),
             table_name,
             service_state: Arc::new(AtomicBox::new(ServiceState::PreStart)),
             dbs: LOTable::default(),
@@ -133,14 +145,14 @@ impl RocksDbStore {
         self.db_options = opts;
     }
 
-    fn open_for_partition(&self, partition: usize) -> DB {
+    fn open_for_partition(&self, partition: usize) -> Result<DB> {
         // TODO: Hint for SST files
         // let dbpath = DBPath::new(
         //     self.storage_url.path(),
         //     get_db_level_free_limit(self.storage_url.path()),
         // ).unwrap();
         let partition_path = self.partition_path(partition);
-        DB::open(&self.db_options, partition_path).unwrap()
+        DB::open(&self.db_options, partition_path).map_err(CallystoError::RocksDBError)
     }
 
     fn partition_path(&self, partition: usize) -> String {
@@ -151,12 +163,93 @@ impl RocksDbStore {
             .unwrap()
     }
 
-    fn db_for_partition(&self, partition: usize) -> Arc<DB> {
-        self.dbs.get(&partition).unwrap_or_else(|| {
-            let db = Arc::new(self.open_for_partition(partition));
-            let _ = self.dbs.insert(partition, db.clone());
-            db
-        })
+    fn db_for_partition(&self, partition: usize) -> Result<Arc<DB>> {
+        match self.dbs.get(&partition) {
+            Some(x) => Ok(x),
+            _ => {
+                let db = Arc::new(self.open_for_partition(partition)?);
+                let _ = self.dbs.insert(partition, db.clone());
+                Ok(db)
+            }
+        }
+    }
+
+    fn revoke_partitions<State>(&self, table: impl Collection<State>, tps: HashSet<CTP>)
+    where
+        State: Clone + Send + Sync + 'static,
+    {
+        tps.iter().for_each(|tp| {
+            if table.changelog_topic().topic_name() == tp.topic {
+                if let Some(_) = self.dbs.get(&tp.partition) {
+                    info!("closing db {} partition {}", tp.topic, tp.partition);
+                    let _ = self.dbs.remove(&tp.partition);
+                }
+            }
+        });
+    }
+
+    async fn assign_partitions<State>(
+        &self,
+        table: impl Collection<State>,
+        tps: HashSet<CTP>,
+        generation_id: usize,
+    ) where
+        State: Clone + Send + Sync + 'static,
+    {
+        self.rebalance_ack.store(true, Ordering::SeqCst);
+        for tp in tps.iter() {
+            if tp.topic == table.changelog_topic().topic_name()
+                && self.rebalance_ack.load(Ordering::SeqCst)
+            {
+                todo!()
+            }
+        }
+        todo!("Implement assigned partitions on rebalance. Also assignors.\n https://github.com/fede1024/rust-rdkafka/blob/5d23e82a675d9df1bf343aedcaa35be864787dab/examples/simple_consumer.rs#L17-L36")
+    }
+
+    async fn try_open_db_for_partition<State>(
+        self,
+        partition: usize,
+        max_retries: usize,
+        retry_delay: f64,
+        generation_id: usize,
+    ) -> Result<Arc<DB>>
+    where
+        State: Clone + Send + Sync + 'static,
+    {
+        for i in (0..max_retries).into_iter() {
+            info!(
+                "opening partition {} for gen id {} app id {}",
+                partition, generation_id, 0
+            );
+            match self.db_for_partition(partition) {
+                Ok(x) => return Ok(x),
+                Err(CallystoError::RocksDBError(ref e)) => {
+                    if i == max_retries - 1 || !e.clone().into_string().contains("lock") {
+                        // Release all the locks and crash
+                        warn!("DB for partition {} retries timed out", partition);
+                        <Self as Service<State>>::stop(&self).await;
+                        return Err(CallystoError::RocksDBError(e.clone()));
+                    }
+
+                    let rdelay: u64 = retry_delay.round() as _;
+                    info!(
+                        "DB for partition {} is locked! Retry in {}s...",
+                        partition, rdelay
+                    );
+                    // TODO: Generation check that rebalance occurred again.
+
+                    Delay::new(Duration::from_secs(retry_delay.round() as _)).await;
+                    e
+                }
+                _ => unreachable!("Shouldn't be here."),
+            };
+        }
+
+        Err(CallystoError::GeneralError(format!(
+            "DB Open failure for partition {}",
+            partition
+        )))
     }
 }
 
@@ -222,14 +315,19 @@ where
     State: Clone + Send + Sync + 'static,
 {
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {
-        let offset =
-            self.db_for_partition(tp.partition).get(CALLYSTO_OFFSET_KEY)?
-                .map_or(None, |e| Option::from(usize::from_ne_bytes(e.as_slice().try_into().unwrap())));
+        let offset = self
+            .db_for_partition(tp.partition)?
+            .get(CALLYSTO_OFFSET_KEY)?
+            .map_or(None, |e| {
+                Option::from(usize::from_ne_bytes(e.as_slice().try_into().unwrap()))
+            });
         Ok(offset)
     }
 
     fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()> {
-        Ok(self.db_for_partition(tp.partition).put(CALLYSTO_OFFSET_KEY, offset.to_string())?)
+        Ok(self
+            .db_for_partition(tp.partition)?
+            .put(CALLYSTO_OFFSET_KEY, offset.to_string())?)
     }
 
     fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()> {
@@ -238,13 +336,15 @@ where
         events.iter().for_each(|e| {
             let tp = CTP::new(e.topic().into(), e.partition() as _);
             let offset: usize = e.offset() as _;
-            tp_offsets.entry(tp)
+            tp_offsets
+                .entry(tp)
                 .and_modify(|o| *o = offset.max(*o))
                 .or_insert(offset);
 
             match e.payload() {
                 Some(p) => {
-                    write_batches.entry(e.partition() as _)
+                    write_batches
+                        .entry(e.partition() as _)
                         .and_modify(|wb| {
                             wb.put(e.key().unwrap(), p);
                         })
@@ -253,9 +353,10 @@ where
                             wb.put(e.key().unwrap(), p);
                             wb
                         });
-                },
+                }
                 _ => {
-                    write_batches.entry(e.partition() as _)
+                    write_batches
+                        .entry(e.partition() as _)
                         .and_modify(|wb| {
                             wb.delete(e.key().unwrap());
                         })
@@ -268,9 +369,13 @@ where
             }
         });
 
-        write_batches.into_iter().try_for_each(|(partition, batch)| {
-            self.db_for_partition(partition).write(batch)
-        })?;
+        write_batches
+            .into_iter()
+            .try_for_each(|(partition, batch)| {
+                self.db_for_partition(partition)?
+                    .write(batch)
+                    .map_err(CallystoError::RocksDBError)
+            })?;
 
         tp_offsets.into_iter().try_for_each(|(tp, offset)| {
             <Self as Store<State>>::set_persisted_offset(self, tp, offset)
@@ -280,7 +385,14 @@ where
     }
 
     fn reset_state(&self) -> Result<()> {
-        todo!()
+        self.dbs.clear();
+        let p = std::fs::canonicalize(
+            self.storage_url
+                .to_file_path()
+                .map_err(|_| CallystoError::GeneralError("To file path failed.".into()))?,
+        )?;
+        std::fs::remove_dir_all(p);
+        Ok(())
     }
 
     async fn on_rebalance(

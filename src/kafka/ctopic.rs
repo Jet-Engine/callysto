@@ -59,6 +59,6 @@ pub struct CTP {
 
 impl CTP {
     pub fn new(topic: String, partition: usize) -> Self {
-        Self {topic, partition}
+        Self { topic, partition }
     }
 }
