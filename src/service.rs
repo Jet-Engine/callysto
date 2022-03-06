@@ -3,7 +3,7 @@ use crate::errors::*;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
 use async_trait::*;
-use futures::future::TryFutureExt;
+use futures::future::{BoxFuture, TryFutureExt};
 use std::future::Future;
 use std::sync::Arc;
 
@@ -26,9 +26,9 @@ where
     /// Execute the given task with state passed in
     async fn call(&self, st: Context<State>) -> Result<State>;
 
-    async fn start(&'static self) -> Result<()>;
+    async fn start(&self) -> Result<BoxFuture<'_, ()>>;
 
-    async fn restart(&'static self) -> Result<()>;
+    async fn restart(&self) -> Result<()>;
 
     async fn crash(&self);
 

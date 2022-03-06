@@ -6,7 +6,7 @@ use crate::service::{Service, ServiceState};
 use crate::stores::store::Store;
 use crate::table::Collection;
 use async_trait::*;
-use futures::future::TryFutureExt;
+use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures_timer::Delay;
 use lever::prelude::{LOTable, TTas};
 use lever::sync::atomics::AtomicBox;
@@ -31,6 +31,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
+use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
 const DEFAULT_WRITE_BUFFER_SIZE: usize = (1_usize << 6) * 1024 * 1024; // 64 MB
@@ -99,6 +100,7 @@ where
 
 #[derive(Clone)]
 pub struct RocksDbStore {
+    app_name: String,
     storage_url: Url,
     db_lock: Arc<TTas<()>>,
     rebalance_ack: Arc<AtomicBool>,
@@ -109,8 +111,9 @@ pub struct RocksDbStore {
 }
 
 impl RocksDbStore {
-    pub fn new(storage_url: Url, table_name: String) -> Self {
+    pub fn new(app_name: String, storage_url: Url, table_name: String) -> Self {
         let mut rds = Self {
+            app_name,
             storage_url,
             db_lock: Arc::new(TTas::new(())),
             rebalance_ack: Arc::new(AtomicBool::default()),
@@ -163,7 +166,10 @@ impl RocksDbStore {
 
     fn partition_path(&self, partition: usize) -> String {
         PathBuf::from(self.storage_url.path())
-            .join(format!("{}-{}.db", self.table_name, partition))
+            .join(format!(
+                "{}-{}-{}.db",
+                self.app_name, self.table_name, partition
+            ))
             .into_os_string()
             .into_string()
             .unwrap()
@@ -272,15 +278,20 @@ where
         todo!()
     }
 
-    async fn start(&'static self) -> Result<()> {
-        info!("Rocksdb backend is started.");
-        Ok(())
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        let closure = async move {
+            info!("Rocksdb backend is started.");
+        };
+
+        Ok(closure.boxed())
     }
 
-    async fn restart(&'static self) -> Result<()> {
-        <Self as Service<State>>::stop(self)
+    async fn restart(&self) -> Result<()> {
+        <Self as Service<State>>::stop(&self)
             .and_then(|_| <Self as Service<State>>::start(self))
-            .await
+            .await;
+
+        Ok(())
     }
 
     async fn crash(&self) {

@@ -3,10 +3,13 @@ use crate::definitions::Context;
 use crate::errors::*;
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
+use crate::prelude::TableAgent;
 use crate::service::{Service, ServiceState};
 use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
 use async_trait::async_trait;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
@@ -16,7 +19,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 use url::Url;
-use crate::prelude::TableAgent;
 
 #[derive(Clone)]
 pub struct CTable<State = ()>
@@ -41,7 +43,7 @@ where
         config: Config,
         client_config: ClientConfig,
     ) -> Result<Self> {
-        let data = Self::new_storage(storage_url.clone(), table_name.clone())?;
+        let data = Self::new_storage(app_name.clone(), storage_url.clone(), table_name.clone())?;
         let changelog_topic = CTopic::new(
             format!("{}-{}-changelog", app_name, table_name),
             client_config,
@@ -91,10 +93,14 @@ where
         self.data.del(serialized_key, msg)
     }
 
-    fn new_storage(storage_url: Url, table_name: String) -> Result<Arc<dyn Store<State>>> {
+    fn new_storage(
+        app_name: String,
+        storage_url: Url,
+        table_name: String,
+    ) -> Result<Arc<dyn Store<State>>> {
         match storage_url.scheme().to_lowercase().as_str() {
             "rocksdb" | "rocks" => {
-                let rdb = RocksDbStore::new(storage_url, table_name);
+                let rdb = RocksDbStore::new(app_name, storage_url, table_name);
                 Ok(Arc::new(rdb))
             }
             "aerospikedb" | "aerospike" => todo!(),
@@ -240,23 +246,20 @@ where
         Ok(st.state().clone())
     }
 
-    async fn start(&'static self) -> Result<()> {
-        println!("CTABLE");
-        let handle = bastion::executor::spawn(async move {
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        let closure = async move {
             info!(
                 "Started - Table `{}` - Changelog Topic `{}`",
                 self.table_name,
                 self.changelog_topic_name()
             );
-            self.data.start().await
-        });
+            self.data.start().await;
+        };
 
-        handle.await;
-
-        Ok(())
+        Ok(closure.boxed())
     }
 
-    async fn restart(&'static self) -> Result<()> {
+    async fn restart(&self) -> Result<()> {
         todo!()
     }
 

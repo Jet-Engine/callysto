@@ -1,6 +1,8 @@
 use std::borrow::Borrow;
+use std::cell::{Cell, RefCell, UnsafeCell};
 use std::collections::HashMap;
 use std::default::Default;
+use std::fmt::Alignment::Center;
 use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -42,7 +44,7 @@ where
     timers: LOTable<usize, Arc<dyn Task<State>>>,
     cronjobs: LOTable<usize, Arc<CronJob<State>>>,
     services: LOTable<usize, Arc<dyn Service<State>>>,
-    agents: LOTable<usize, Arc<dyn Service<State>>>,
+    agents: LOTable<usize, Arc<dyn Agent<State>>>,
     tables: LOTable<String, Arc<CTable<State>>>,
     table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
 }
@@ -137,11 +139,11 @@ where
         name: T,
         topic: CTopic,
         tables: HashMap<String, CTable<State>>,
-        clo: F
+        clo: F,
     ) -> &Self
-        where
-            F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
-            Fut: Future<Output = CResult<()>> + Send + 'static,
+    where
+        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let table_agent = CTableAgent::new(
@@ -151,7 +153,7 @@ where
             self.state.clone(),
             topic,
             tables,
-            Vec::default()
+            Vec::default(),
         );
         self.table_agents.insert(stub, Arc::new(table_agent));
         self
@@ -333,13 +335,11 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Agent with ID: {}", aid);
-                let agent: Arc<dyn Service<State>> = agent.clone();
                 bastion::executor::spawn(async move {
-                    // UNSAFE: This is end of the application.
-                    // All services are running in a loop, it will only break if they crash.
-                    let agent: &'static dyn Service<State> =
-                        unsafe { std::mem::transmute(&*agent) };
-                    let _slow_drop = agent.start().await;
+                    match agent.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Agent with ID: {}.", aid),
+                    }
                 })
             })
             .collect();
@@ -349,15 +349,11 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Table Agent with ID: {}", aid);
-                let agent: Arc<dyn TableAgent<State>> = agent.clone();
                 bastion::executor::spawn(async move {
-                    // UNSAFE: This is end of the application.
-                    println!("STARTING");
-                    // All services are running in a loop, it will only break if they crash.
-                    let agent: &'static dyn Service<State> =
-                        unsafe { std::mem::transmute(&*agent) };
-                    println!("MAMACITA");
-                    let _slow_drop = agent.start().await;
+                    match agent.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Table Agent with ID: {}.", aid),
+                    }
                 })
             })
             .collect();

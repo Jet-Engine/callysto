@@ -15,7 +15,7 @@ async def produce_message(topic: str, message: str):
 
 async def main():
     # Schedule 10 calls *concurrently*:
-    l = [produce_message("example", f"{i}") for i in range(0, 10_000)]
+    l = [produce_message("example", f"{i * (1_000_000 + i)}") for i in range(0, 1_000)]
     L = await asyncio.gather(*l)
     print("DONE")
     # print(L)

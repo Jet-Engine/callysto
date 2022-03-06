@@ -4,13 +4,15 @@ use crate::kafka::ctopic::*;
 use crate::service::{Service, ServiceState};
 use crate::table::CTable;
 use async_trait::*;
-use futures::future::TryFutureExt;
+use futures::future::{BoxFuture, TryFutureExt};
+use futures::FutureExt;
 use rdkafka::message::OwnedMessage;
 use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
 use tracing::info;
+use tracing_subscriber::filter::FilterExt;
 
 pub type Tables<State> = HashMap<String, CTable<State>>;
 
@@ -63,7 +65,7 @@ where
 
 #[async_trait]
 // pub trait Agent<State>: Service<State> + Send + Sync + 'static
-pub trait Agent<State>: Send + Sync + 'static
+pub trait Agent<State>: Service<State> + Send + Sync + 'static
 where
     State: Clone + Send + Sync + 'static,
 {
@@ -96,34 +98,34 @@ where
         Ok(self.state.clone())
     }
 
-    async fn start(&'static self) -> Result<()> {
-        for x in &self.dependencies {
-            x.start().await;
-        }
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        let consumer = self.topic.consumer();
+        let state = self.state.clone();
+        let closure = async move {
+            for x in &self.dependencies {
+                info!("CAgent - {} - Dependencies are starting", self.agent_name);
+                x.start().await;
+            }
 
-        let handle = bastion::executor::spawn(async move {
-            let consumer = self.topic.consumer();
             info!(
-                "Started - Consumer Group `{}` - Topic `{}`",
-                self.app_name,
+                "Started CAgent {} - Consumer Group `{}` - Topic `{}`",
+                self.agent_name,
+                self.app_name.clone(),
                 self.topic.topic_name()
             );
+
             loop {
-                let state = self.state.clone();
                 let message = consumer.recv().await;
+                let state = state.clone();
                 let context = Context::new(state);
-                let _slow_drop = <Self as Agent<State>>::call(self, message, context)
-                    .await
-                    .unwrap();
+                let _slow_drop = Agent::<State>::call(self, message, context).await.unwrap();
             }
-        });
+        };
 
-        handle.await;
-
-        Ok(())
+        Ok(closure.boxed())
     }
 
-    async fn restart(&'static self) -> Result<()> {
+    async fn restart(&self) -> Result<()> {
         todo!()
     }
 
@@ -215,7 +217,7 @@ where
 }
 
 #[async_trait]
-pub trait TableAgent<State>: Send + Sync + 'static
+pub trait TableAgent<State>: Service<State> + Send + Sync + 'static
 where
     State: Clone + Send + Sync + 'static,
 {
@@ -258,16 +260,17 @@ where
         Ok(self.state.clone())
     }
 
-    async fn start(&'static self) -> Result<()> {
-        println!("CTableAgent");
-        for (table_name, table) in &self.tables {
-            table.start().await;
-        }
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        info!("CTableAgent");
+        let closure = async move {
+            for (table_name, table) in &self.tables {
+                table.start().await.unwrap().await;
+                info!("CTable: `{}` table launched", table_name);
+            }
 
-        let handle = bastion::executor::spawn(async move {
             let consumer = self.topic.consumer();
             info!(
-                "Started Table Agent- Consumer Group `{}` - Topic `{}`",
+                "Started Table Agent - Consumer Group `{}` - Topic `{}`",
                 self.app_name,
                 self.topic.topic_name()
             );
@@ -276,18 +279,16 @@ where
                 let tables = self.tables.clone();
                 let message = consumer.recv().await;
                 let context = Context::new(state);
-                let _slow_drop = <Self as TableAgent<State>>::call(self, message, tables, context)
+                let _slow_drop = TableAgent::<State>::call(self, message, tables, context)
                     .await
                     .unwrap();
             }
-        });
+        };
 
-        handle.await;
-
-        Ok(())
+        Ok(closure.boxed())
     }
 
-    async fn restart(&'static self) -> Result<()> {
+    async fn restart(&self) -> Result<()> {
         todo!()
     }
 
@@ -341,19 +342,19 @@ where
     async fn call(&self, st: Context<State>) -> CResult<State>;
 }
 
-#[async_trait]
-impl<State, F, Fut> Task<State> for F
-where
-    State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-    Fut: Future<Output = CResult<State>> + Send + 'static,
-{
-    async fn call(&self, req: Context<State>) -> CResult<State> {
-        let fut = (self)(req);
-        let res = fut.await?;
-        Ok(res.into())
-    }
-}
+// #[async_trait]
+// impl<State, F, Fut> Task<State> for F
+// where
+//     State: Clone + Send + Sync + 'static,
+//     F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+//     Fut: Future<Output = CResult<State>> + Send + 'static,
+// {
+//     async fn call(&self, req: Context<State>) -> CResult<State> {
+//         let fut = (self)(req);
+//         let res = fut.await?;
+//         Ok(res.into())
+//     }
+// }
 
 ///////////////////////////////////////////////////
 //////// CService (Custom Service)
