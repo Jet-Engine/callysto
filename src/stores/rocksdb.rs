@@ -1,14 +1,16 @@
 use crate::definitions::Context;
 use crate::errors::{CallystoError, Result};
 use crate::kafka::ctopic::CTP;
+use crate::prelude::CTable;
 use crate::service::{Service, ServiceState};
 use crate::stores::store::Store;
 use crate::table::Collection;
 use async_trait::*;
 use futures::future::TryFutureExt;
 use futures_timer::Delay;
-use lever::prelude::LOTable;
+use lever::prelude::{LOTable, TTas};
 use lever::sync::atomics::AtomicBox;
+use lever::sync::ifaces::LockIface;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
 use rdkafka::Message;
@@ -96,6 +98,7 @@ where
 #[derive(Clone)]
 pub struct RocksDbStore {
     storage_url: Url,
+    db_lock: Arc<TTas<()>>,
     rebalance_ack: Arc<AtomicBool>,
     table_name: String,
     service_state: Arc<AtomicBox<ServiceState>>,
@@ -107,6 +110,7 @@ impl RocksDbStore {
     pub fn new(storage_url: Url, table_name: String) -> Self {
         let mut rds = Self {
             storage_url,
+            db_lock: Arc::new(TTas::new(())),
             rebalance_ack: Arc::new(AtomicBool::default()),
             table_name,
             service_state: Arc::new(AtomicBox::new(ServiceState::PreStart)),
@@ -201,6 +205,10 @@ impl RocksDbStore {
             if tp.topic == table.changelog_topic().topic_name()
                 && self.rebalance_ack.load(Ordering::SeqCst)
             {
+                self.clone()
+                    .try_open_db_for_partition::<State>(tp.partition, 30, 1., generation_id)
+                    .await;
+                Delay::new(Duration::from_millis(5)).await;
                 todo!()
             }
         }
@@ -314,6 +322,10 @@ impl<State> Store<State> for RocksDbStore
 where
     State: Clone + Send + Sync + 'static,
 {
+    fn table(&self) -> CTable<State> {
+        todo!()
+    }
+
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {
         let offset = self
             .db_for_partition(tp.partition)?
@@ -402,6 +414,13 @@ where
         newly_assigned: Vec<CTP>,
         generation_id: usize,
     ) -> Result<()> {
+        self.rebalance_ack.store(false, Ordering::SeqCst);
+        if let Some(_lock) = self.db_lock.try_lock() {
+            //             self.revoke_partitions(self.table, revoked)
+            //             await self.assign_partitions(self.table, newly_assigned, generation_id)
+        }
+        // Dropped but unlock anyway.
+        let _ = self.db_lock.unlock();
         todo!()
     }
 

@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::kafka::ctopic::CTP;
 use crate::service::*;
+use crate::table::CTable;
 use async_trait::*;
 use rdkafka::message::OwnedMessage;
 
@@ -9,6 +10,8 @@ pub trait Store<State>: Service<State>
 where
     State: Clone + Send + Sync + 'static,
 {
+    fn table(&self) -> CTable<State>;
+
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>>;
 
     fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()>;
