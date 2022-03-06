@@ -1,10 +1,10 @@
 use rdkafka::consumer::ConsumerContext;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ProcessingGuarantee {
     AtLeastOnce,
-    ExactlyOnce
+    ExactlyOnce,
 }
 
 impl fmt::Display for ProcessingGuarantee {
@@ -17,10 +17,10 @@ impl fmt::Display for ProcessingGuarantee {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum IsolationLevel {
     ReadUncommitted,
-    ReadCommitted
+    ReadCommitted,
 }
 
 impl fmt::Display for IsolationLevel {
@@ -33,10 +33,10 @@ impl fmt::Display for IsolationLevel {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OffsetReset {
     Earliest,
-    Latest
+    Latest,
 }
 
 impl fmt::Display for OffsetReset {
@@ -53,18 +53,17 @@ pub enum PartitionAssignment {
     RangeAssignor,
     RoundRobinAssignor,
     CooperativeStickyAssignor,
-    CustomAssignor(Box<dyn ConsumerContext>) // todo: implement assign
+    CustomAssignor(Box<dyn ConsumerContext>), // todo: implement assign
 }
-
 
 ///
 /// Security Protocol
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SecurityProtocol {
     Plaintext,
     Ssl,
     SaslPlaintext,
-    SaslSsl
+    SaslSsl,
 }
 
 impl fmt::Display for SecurityProtocol {
@@ -93,7 +92,7 @@ pub enum SaslMechanism {
     Plain,
     ScramSha256,
     ScramSha512,
-    OauthBearer
+    OauthBearer,
 }
 
 impl fmt::Display for SaslMechanism {
@@ -103,17 +102,16 @@ impl fmt::Display for SaslMechanism {
             Self::Plain => "PLAIN",
             Self::ScramSha256 => "SCRAM-SHA-256",
             Self::ScramSha512 => "SCRAM-SHA-512",
-            Self::OauthBearer => "OAUTHBEARER"
+            Self::OauthBearer => "OAUTHBEARER",
         };
         write!(f, "{}", a)
     }
 }
 
-
 #[derive(Debug, Copy, Clone)]
 pub enum EndpointIdentificationAlgorithm {
     None,
-    Https
+    Https,
 }
 
 impl fmt::Display for EndpointIdentificationAlgorithm {

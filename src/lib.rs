@@ -1,21 +1,29 @@
-pub mod kafka;
-pub mod table;
-pub mod enums;
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(unused_must_use)]
+#![allow(unused)]
+
 pub mod app;
+pub mod config;
 pub mod definitions;
 pub mod errors;
-pub mod config;
-pub use rdkafka as rdkafka;
+pub mod kafka;
+pub mod service;
+pub mod table;
+
+mod runtime;
+mod stores;
+
+pub use rdkafka;
 
 pub mod prelude {
-    pub use super::kafka::*;
-    pub use super::table::*;
-    pub use super::enums::*;
     pub use super::app::*;
+    pub use super::config::*;
     pub use super::definitions::*;
     pub use super::errors::*;
-    pub use super::config::*;
+    pub use super::kafka::*;
     pub use super::rdkafka::*;
+    pub use super::table::*;
 }
 
 #[cfg(test)]

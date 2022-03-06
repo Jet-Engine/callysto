@@ -1,46 +1,58 @@
+use std::borrow::Borrow;
+use std::cell::{Cell, RefCell, UnsafeCell};
+use std::collections::HashMap;
 use std::default::Default;
-use std::sync::Arc;
+use std::fmt::Alignment::Center;
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
 use bastion::spawn;
 use futures::future::join_all;
-
-use futures::stream::StreamExt;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
-use rdkafka::ClientConfig;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
+use rdkafka::ClientConfig;
 use tracing::{error, info};
 use tracing_subscriber::{self, fmt, EnvFilter};
+use url::Url;
 
 use crate::definitions::*;
-use crate::kafka::{BastionRuntime, CTopic};
+use crate::errors::Result as CResult;
+use crate::kafka::{ctopic::*, runtime::BastionRuntime};
 use crate::prelude::{Config, CronJob};
-use crate::table::CTable;
+use crate::service::Service;
+use crate::table::{CTable, Collection};
 
-pub struct Callysto<Store>
+// TODO: not sure static dispatch is better here. Check on using State: 'static.
+
+pub struct Callysto<State>
 where
-    Store: 'static
+    State: Clone + Send + Sync + 'static,
 {
     app_name: String,
-    storage: Store,
+    state: State,
+    storage_url: Option<Url>,
     brokers: String,
     config: Config,
     stubs: Arc<AtomicUsize>,
-    tasks: LOTable<usize, Arc<dyn Task<Store>>>,
-    timers: LOTable<usize, Arc<dyn Task<Store>>>,
-    cronjobs: LOTable<usize, Arc<CronJob<Store>>>,
-    services: LOTable<usize, Arc<dyn Service<Store>>>,
-    agents: LOTable<usize, Arc<dyn Agent<Store>>>,
-    topics: LOTable<usize, CTopic>
+    stub_lookup: LOTable<usize, String>,
+    tasks: LOTable<usize, Arc<dyn Task<State>>>,
+    timers: LOTable<usize, Arc<dyn Task<State>>>,
+    cronjobs: LOTable<usize, Arc<CronJob<State>>>,
+    services: LOTable<usize, Arc<dyn Service<State>>>,
+    agents: LOTable<usize, Arc<dyn Agent<State>>>,
+    tables: LOTable<String, Arc<CTable<State>>>,
+    table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
 }
 
 impl Callysto<()> {
     #[must_use]
     pub fn new() -> Self {
-        Self::with_storage(())
+        Self::with_state(())
     }
 }
 
@@ -50,15 +62,17 @@ impl Default for Callysto<()> {
     }
 }
 
-impl<Store> Callysto<Store>
+impl<State> Callysto<State>
 where
-    Store: Clone + Send + Sync + 'static
+    State: Clone + Send + Sync + 'static,
 {
-    pub fn with_storage(storage: Store) -> Self {
+    pub fn with_state(state: State) -> Self {
         Self {
             app_name: "callysto-app".to_owned(),
-            storage,
+            state,
+            storage_url: None,
             stubs: Arc::new(AtomicUsize::default()),
+            stub_lookup: LOTable::default(),
             brokers: "localhost:9092".to_owned(),
             config: Config::default(),
             tasks: LOTable::default(),
@@ -66,8 +80,18 @@ where
             cronjobs: LOTable::default(),
             services: LOTable::default(),
             agents: LOTable::default(),
-            topics: LOTable::default()
+            tables: LOTable::default(),
+            table_agents: LOTable::default(),
         }
+    }
+
+    pub fn with_storage<T>(&mut self, url: T) -> &mut Self
+    where
+        T: AsRef<str>,
+    {
+        let url = Url::parse(url.as_ref()).expect("Storage backend url parsing failed.");
+        self.storage_url = Some(url);
+        self
     }
 
     pub fn with_name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
@@ -80,77 +104,152 @@ where
         self
     }
 
-    pub fn task(&self, t: impl Task<Store>) -> &Self {
+    pub fn task(&self, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.tasks.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn timer(&self, t: impl Task<Store>) -> &Self {
+    pub fn timer(&self, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.timers.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn agent(&self, topic: CTopic, s: impl Agent<Store>) -> &Self
+    pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.agents.insert(stub, Arc::new(s));
-        self.topics.insert(stub, topic);
+        let agent = CAgent::new(
+            clo,
+            name.as_ref().to_string(),
+            self.app_name.clone(),
+            self.state.clone(),
+            topic,
+            Vec::default(),
+        );
+        self.agents.insert(stub, Arc::new(agent));
         self
     }
 
-    pub fn service(&self, s: impl Service<Store>) -> &Self {
+    pub fn table_agent<T: AsRef<str>, F, Fut>(
+        &self,
+        name: T,
+        topic: CTopic,
+        tables: HashMap<String, CTable<State>>,
+        clo: F,
+    ) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let table_agent = CTableAgent::new(
+            clo,
+            name.as_ref().to_string(),
+            self.app_name.clone(),
+            self.state.clone(),
+            topic,
+            tables,
+            Vec::default(),
+        );
+        self.table_agents.insert(stub, Arc::new(table_agent));
+        self
+    }
+
+    pub fn service(&self, s: impl Service<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
         self
     }
 
-    pub fn crontab<C: AsRef<str>>(&self, cron_expr: C, t: impl Task<Store>) -> &Self {
+    pub fn crontab<C: AsRef<str>>(&self, cron_expr: C, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let cron_job = Arc::new(CronJob::new(cron_expr, t));
         self.cronjobs.insert(stub, cron_job);
         self
     }
 
+    // You have searched for "Mutex", "CondVar" or "RwLock". You won't find them.
+
     pub fn topic<T>(&self, topic: T) -> CTopic
     where
-        T: AsRef<str>
+        T: AsRef<str>,
     {
+        let cc = self.build_client_config();
+        CTopic::new(topic, cc)
+    }
 
+    fn build_client_config(&self) -> ClientConfig {
         let mut cc = ClientConfig::new();
 
-        cc
-            .set("bootstrap.servers", &*self.brokers)
-            .set("enable.auto.commit", format!("{}", self.config.enable_auto_commit))
-            .set("auto.offset.reset", format!("{}", self.config.auto_offset_reset))
-            .set("auto.commit.interval.ms", format!("{}", self.config.auto_commit_interval_ms))
-            .set("enable.auto.offset.store", format!("{}", self.config.enable_auto_offset_store))
-            .set("max.poll.interval.ms", format!("{}", self.config.max_poll_interval_ms))
-            .set("max.partition.fetch.bytes", format!("{}", self.config.max_partition_fetch_bytes))
-            .set("fetch.wait.max.ms", format!("{}", self.config.fetch_max_wait_ms))
-            .set("request.timeout.ms", format!("{}", self.config.request_timeout_ms))
+        cc.set("bootstrap.servers", &*self.brokers)
+            .set(
+                "enable.auto.commit",
+                format!("{}", self.config.enable_auto_commit),
+            )
+            .set(
+                "auto.offset.reset",
+                format!("{}", self.config.auto_offset_reset),
+            )
+            .set(
+                "auto.commit.interval.ms",
+                format!("{}", self.config.auto_commit_interval_ms),
+            )
+            .set(
+                "enable.auto.offset.store",
+                format!("{}", self.config.enable_auto_offset_store),
+            )
+            .set(
+                "max.poll.interval.ms",
+                format!("{}", self.config.max_poll_interval_ms),
+            )
+            .set(
+                "max.partition.fetch.bytes",
+                format!("{}", self.config.max_partition_fetch_bytes),
+            )
+            .set(
+                "fetch.wait.max.ms",
+                format!("{}", self.config.fetch_max_wait_ms),
+            )
+            .set(
+                "request.timeout.ms",
+                format!("{}", self.config.request_timeout_ms),
+            )
             .set("check.crcs", format!("{}", self.config.check_crcs))
-            .set("session.timeout.ms", format!("{}", self.config.session_timeout_ms))
-            .set("heartbeat.interval.ms", format!("{}", self.config.heartbeat_interval_ms))
-            .set("isolation.level", format!("{}", self.config.isolation_level))
+            .set(
+                "session.timeout.ms",
+                format!("{}", self.config.session_timeout_ms),
+            )
+            .set(
+                "heartbeat.interval.ms",
+                format!("{}", self.config.heartbeat_interval_ms),
+            )
+            .set(
+                "isolation.level",
+                format!("{}", self.config.isolation_level),
+            )
             // Consumer group ID
             .set("group.id", self.app_name.as_str());
 
         // Security settings
-        cc
-            .set("security.protocol", format!("{}", self.config.security_protocol));
+        cc.set(
+            "security.protocol",
+            format!("{}", self.config.security_protocol),
+        );
 
-        use crate::enums::SecurityProtocol::*;
+        use crate::kafka::enums::SecurityProtocol::*;
         let cc = match self.config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
                 self.build_ssl_context(cc)
-            },
+            }
             SaslPlaintext => {
                 // Only SASL context build is needed.
                 self.build_sasl_context(cc)
-            },
+            }
             SaslSsl => {
                 // Build both contexts with available arguments.
                 let cc = self.build_sasl_context(cc);
@@ -158,52 +257,69 @@ where
             }
             _ => cc,
         };
-
-        CTopic::new(topic, cc)
+        cc
     }
 
     fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
-        self.config.sasl_mechanism.clone().map(|e| {
-            cc.set("sasl.mechanism", format!("{}", e))
-        });
+        self.config
+            .sasl_mechanism
+            .clone()
+            .map(|e| cc.set("sasl.mechanism", format!("{}", e)));
 
-        self.config.sasl_username.clone().map(|e| {
-            cc.set("sasl.username", e)
-        });
+        self.config
+            .sasl_username
+            .clone()
+            .map(|e| cc.set("sasl.username", e));
 
-        self.config.sasl_password.clone().map(|e| {
-            cc.set("sasl.password", e)
-        });
+        self.config
+            .sasl_password
+            .clone()
+            .map(|e| cc.set("sasl.password", e));
 
         cc
     }
 
     fn build_ssl_context(&self, mut cc: ClientConfig) -> ClientConfig {
-        self.config.ssl_certificate_location.clone().map(|e| {
-            cc.set("ssl.certificate.location", e)
-        });
+        self.config
+            .ssl_certificate_location
+            .clone()
+            .map(|e| cc.set("ssl.certificate.location", e));
 
-        self.config.ssl_ca_location.clone().map(|e| {
-            cc.set("ssl.ca.location", e)
-        });
+        self.config
+            .ssl_ca_location
+            .clone()
+            .map(|e| cc.set("ssl.ca.location", e));
 
-        self.config.ssl_key_location.clone().map(|e| {
-            cc.set("ssl.key.location", e)
-        });
+        self.config
+            .ssl_key_location
+            .clone()
+            .map(|e| cc.set("ssl.key.location", e));
 
-        self.config.ssl_key_password.clone().map(|e| {
-            cc.set("ssl.key.password", e)
-        });
+        self.config
+            .ssl_key_password
+            .clone()
+            .map(|e| cc.set("ssl.key.password", e));
 
-        self.config.ssl_endpoint_identification_algorithm.clone().map(|e| {
-            cc.set("ssl.endpoint.identification.algorithm", format!("{}", e))
-        });
+        self.config
+            .ssl_endpoint_identification_algorithm
+            .clone()
+            .map(|e| cc.set("ssl.endpoint.identification.algorithm", format!("{}", e)));
 
         cc
     }
 
-    pub fn table(&self) -> CTable {
-        todo!()
+    pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {
+        if self.storage_url.is_none() {
+            panic!("Tables can't be used without storage backend. Bailing...");
+        }
+        CTable::new(
+            self.app_name.clone(),
+            self.storage_url.clone().unwrap(),
+            table_name.as_ref().into(),
+            self.config.clone(),
+            self.build_client_config(),
+        )
+        .expect("Table build failed.")
     }
 
     // TODO: page method to serve
@@ -214,22 +330,35 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let agents: Vec<RecoverableHandle<()>> = self.agents.iter().zip(self.topics.iter()).map(|((aid, agent), (tid, topic))| {
-            // let agent = agent.clone();
-            let storage = self.storage.clone();
-            let consumer_group_name = self.app_name.clone();
-
-            bastion::executor::blocking(async move {
-                let consumer = topic.consumer();
-                info!("Started - Consumer Group `{}` - Topic `{}`", consumer_group_name, topic.topic_name());
-                loop {
-                    let storage = storage.clone();
-                    let message = consumer.recv().await;
-                    let context = Context::new(storage);
-                    let _slow_drop = agent.call(message, context).await.unwrap();
-                }
+        let mut agents: Vec<RecoverableHandle<()>> = self
+            .agents
+            .iter()
+            .map(|(aid, agent)| {
+                info!("Starting Agent with ID: {}", aid);
+                bastion::executor::spawn(async move {
+                    match agent.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Agent with ID: {}.", aid),
+                    }
+                })
             })
-        }).collect();
+            .collect();
+
+        let table_agents: Vec<RecoverableHandle<()>> = self
+            .table_agents
+            .iter()
+            .map(|(aid, agent)| {
+                info!("Starting Table Agent with ID: {}", aid);
+                bastion::executor::spawn(async move {
+                    match agent.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Table Agent with ID: {}.", aid),
+                    }
+                })
+            })
+            .collect();
+
+        agents.extend(table_agents);
 
         bastion::executor::run(join_all(agents));
     }
