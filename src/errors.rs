@@ -14,6 +14,9 @@ pub enum CallystoError {
     #[error("General error: {0}")]
     GeneralError(String),
 
+    #[error("Binary Serialization error: {0}")]
+    BinSerializationError(#[from] bincode::Error),
+
     #[error("RocksDB Error")]
     RocksDBError(#[from] rocksdb::Error),
 }

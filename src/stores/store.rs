@@ -4,12 +4,20 @@ use crate::service::*;
 use crate::table::CTable;
 use async_trait::*;
 use rdkafka::message::OwnedMessage;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 #[async_trait]
 pub trait Store<State>: Service<State>
 where
     State: Clone + Send + Sync + 'static,
 {
+    fn get(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<Option<Vec<u8>>>;
+
+    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()>;
+
+    fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()>;
+
     fn table(&self) -> CTable<State>;
 
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>>;

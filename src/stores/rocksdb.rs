@@ -18,7 +18,8 @@ use rocksdb::{
     BlockBasedOptions, Cache, DBPath, DBWithThreadMode, Error, Options as DBOptions,
     SingleThreaded, WriteBatch, DB,
 };
-use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::convert::{identity, TryFrom, TryInto};
@@ -120,28 +121,6 @@ impl RocksDbStore {
         };
         rds.set_db_options();
         rds
-    }
-
-    pub fn get<K, V>(&self, key: K) -> Result<V>
-    where
-        K: Serialize,
-    {
-        todo!()
-    }
-
-    pub fn set<K, V>(&self, key: K, value: V) -> Result<()>
-    where
-        K: Serialize,
-        V: Serialize,
-    {
-        todo!()
-    }
-
-    pub fn del<K>(&self, key: K) -> Result<()>
-    where
-        K: Serialize,
-    {
-        todo!()
     }
 
     pub fn set_db_options(&mut self) {
@@ -345,6 +324,67 @@ impl<State> Store<State> for RocksDbStore
 where
     State: Clone + Send + Sync + 'static,
 {
+    fn get(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<Option<Vec<u8>>> {
+        let partition: usize = msg.partition() as _;
+        let db = self.db_for_partition(partition)?;
+        match db.get(serialized_key.as_slice())? {
+            Some(x) => Ok(Some(bincode::deserialize(x.as_slice())?)),
+            _ => Ok(None),
+        }
+    }
+
+    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+        let partition: usize = msg.partition() as _;
+        let db = self.db_for_partition(partition)?;
+        Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
+    }
+
+    fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+        let partition: usize = msg.partition() as _;
+        let db = self.db_for_partition(partition)?;
+        Ok(db.delete(serialized_key.as_slice())?)
+    }
+
+
+    // fn get<K, V>(&self, key: K, msg: OwnedMessage) -> Result<Option<V>>
+    // where
+    //     Self: Sized,
+    //     K: Serialize,
+    //     V: DeserializeOwned,
+    // {
+    //     let partition: usize = msg.partition() as _;
+    //     let db = self.db_for_partition(partition)?;
+    //     let serialized_key = bincode::serialize(&key)?;
+    //     match db.get(serialized_key.as_slice())? {
+    //         Some(x) => Ok(Some(bincode::deserialize::<V>(x.as_slice())?)),
+    //         _ => Ok(None),
+    //     }
+    // }
+    //
+    // fn set<K, V>(&self, key: K, value: V, msg: OwnedMessage) -> Result<()>
+    // where
+    //     Self: Sized,
+    //     K: Serialize,
+    //     V: Serialize,
+    // {
+    //     let partition: usize = msg.partition() as _;
+    //     let db = self.db_for_partition(partition)?;
+    //     let serialized_key = bincode::serialize(&key)?;
+    //     let serialized_val = bincode::serialize(&value)?;
+    //     Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
+    // }
+    //
+    // fn del<K>(&self, key: K, msg: OwnedMessage) -> Result<()>
+    // where
+    //     Self: Sized,
+    //     K: Serialize,
+    // {
+    //     let partition: usize = msg.partition() as _;
+    //     let db = self.db_for_partition(partition)?;
+    //     let serialized_key = bincode::serialize(&key)?;
+    //     Ok(db.delete(serialized_key.as_slice())?)
+    // }
+
     fn table(&self) -> CTable<State> {
         todo!()
     }

@@ -9,6 +9,7 @@ use crate::stores::store::Store;
 use async_trait::async_trait;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,29 +35,43 @@ where
         todo!()
     }
 
-    pub fn get<K, V>(&self, key: K) -> Result<V>
-    where
-        K: Serialize,
+    ///
+    /// Get element on the table
+    pub fn get<K, V>(&self, key: K, msg: OwnedMessage) -> Result<Option<V>>
+        where
+            K: Serialize,
+            V: DeserializeOwned,
     {
-        todo!()
+        let serialized_key = bincode::serialize(&key)?;
+        match self.data.get(serialized_key, msg)? {
+            Some(value_slice) => Ok(Some(bincode::deserialize::<V>(value_slice.as_slice())?)),
+            _ => Ok(None)
+        }
     }
 
-    pub fn set<K, V>(&self, key: K, value: V) -> Result<()>
-    where
-        K: Serialize,
-        V: Serialize,
+    ///
+    /// Set element on the table
+    pub fn set<K, V>(&self, key: K, value: V, msg: OwnedMessage) -> Result<()>
+        where
+            K: Serialize,
+            V: Serialize,
     {
-        todo!()
+        let serialized_key = bincode::serialize(&key)?;
+        let serialized_val = bincode::serialize(&value)?;
+        self.data.set(serialized_key, serialized_val, msg)
     }
 
-    pub fn del<K>(&self, key: K) -> Result<()>
-    where
-        K: Serialize,
+    ///
+    /// Delete element on the table
+    pub fn del<K>(&self, key: K, msg: OwnedMessage) -> Result<()>
+        where
+            K: Serialize,
     {
-        todo!()
+        let serialized_key = bincode::serialize(&key)?;
+        self.data.del(serialized_key, msg)
     }
 
-    fn new_storage(storage_url: Url, table_name: String) -> Result<Arc<dyn Store<State>>> {
+    pub fn new_storage(storage_url: Url, table_name: String) -> Result<Arc<dyn Store<State>>> {
         match storage_url.scheme().to_lowercase().as_str() {
             "rocksdb" | "rocks" => {
                 let rdb = RocksDbStore::new(storage_url, table_name);
@@ -129,6 +144,19 @@ impl<State> Store<State> for CTable<State>
 where
     State: Clone + Send + Sync + 'static,
 {
+    fn get(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<Option<Vec<u8>>> {
+        self.data.get(serialized_key, msg)
+    }
+
+    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+        self.data.set(serialized_key, serialized_val, msg)
+    }
+
+    fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+        self.data.del(serialized_key, msg)
+    }
+
+
     fn table(&self) -> CTable<State> {
         self.clone()
     }
