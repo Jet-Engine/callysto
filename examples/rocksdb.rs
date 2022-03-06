@@ -21,7 +21,7 @@ fn main() {
     app.with_name("durable-app")
         .with_storage("rocksdb:///home/theo/projects/calstorage");
 
-    app.durable_agent(
+    app.table_agent(
         app.topic("example"),
         app.table("odd_numbers"),
         counter_agent,

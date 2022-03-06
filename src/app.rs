@@ -111,11 +111,11 @@ where
         self
     }
 
-    pub fn durable_agent(
+    pub fn table_agent(
         &self,
         topic: CTopic,
         table: CTable<State>,
-        s: impl DurableAgent<State>,
+        s: impl TableAgent<State>,
     ) -> &Self {
         todo!()
     }

@@ -14,7 +14,12 @@ where
 {
     fn get(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<Option<Vec<u8>>>;
 
-    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()>;
+    fn set(
+        &self,
+        serialized_key: Vec<u8>,
+        serialized_val: Vec<u8>,
+        msg: OwnedMessage,
+    ) -> Result<()>;
 
     fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()>;
 

@@ -333,7 +333,12 @@ where
         }
     }
 
-    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+    fn set(
+        &self,
+        serialized_key: Vec<u8>,
+        serialized_val: Vec<u8>,
+        msg: OwnedMessage,
+    ) -> Result<()> {
         let partition: usize = msg.partition() as _;
         let db = self.db_for_partition(partition)?;
         Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
@@ -344,7 +349,6 @@ where
         let db = self.db_for_partition(partition)?;
         Ok(db.delete(serialized_key.as_slice())?)
     }
-
 
     // fn get<K, V>(&self, key: K, msg: OwnedMessage) -> Result<Option<V>>
     // where

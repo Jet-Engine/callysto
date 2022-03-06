@@ -30,7 +30,7 @@ where
 }
 
 #[async_trait]
-pub trait DurableAgent<State>: Send + Sync + 'static
+pub trait TableAgent<State>: Send + Sync + 'static
 where
     State: Clone + Send + Sync + 'static,
 {
@@ -46,7 +46,7 @@ where
 }
 
 #[async_trait]
-impl<State, F, Fut> DurableAgent<State> for F
+impl<State, F, Fut> TableAgent<State> for F
 where
     State: Clone + Send + Sync + 'static,
     F: Send + Sync + 'static + Fn(Option<OwnedMessage>, CTable<State>, Context<State>) -> Fut,

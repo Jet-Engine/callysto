@@ -38,23 +38,23 @@ where
     ///
     /// Get element on the table
     pub fn get<K, V>(&self, key: K, msg: OwnedMessage) -> Result<Option<V>>
-        where
-            K: Serialize,
-            V: DeserializeOwned,
+    where
+        K: Serialize,
+        V: DeserializeOwned,
     {
         let serialized_key = bincode::serialize(&key)?;
         match self.data.get(serialized_key, msg)? {
             Some(value_slice) => Ok(Some(bincode::deserialize::<V>(value_slice.as_slice())?)),
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 
     ///
     /// Set element on the table
     pub fn set<K, V>(&self, key: K, value: V, msg: OwnedMessage) -> Result<()>
-        where
-            K: Serialize,
-            V: Serialize,
+    where
+        K: Serialize,
+        V: Serialize,
     {
         let serialized_key = bincode::serialize(&key)?;
         let serialized_val = bincode::serialize(&value)?;
@@ -64,8 +64,8 @@ where
     ///
     /// Delete element on the table
     pub fn del<K>(&self, key: K, msg: OwnedMessage) -> Result<()>
-        where
-            K: Serialize,
+    where
+        K: Serialize,
     {
         let serialized_key = bincode::serialize(&key)?;
         self.data.del(serialized_key, msg)
@@ -148,14 +148,18 @@ where
         self.data.get(serialized_key, msg)
     }
 
-    fn set(&self, serialized_key: Vec<u8>, serialized_val: Vec<u8>, msg: OwnedMessage) -> Result<()> {
+    fn set(
+        &self,
+        serialized_key: Vec<u8>,
+        serialized_val: Vec<u8>,
+        msg: OwnedMessage,
+    ) -> Result<()> {
         self.data.set(serialized_key, serialized_val, msg)
     }
 
     fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()> {
         self.data.del(serialized_key, msg)
     }
-
 
     fn table(&self) -> CTable<State> {
         self.clone()
