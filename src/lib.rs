@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(unused_must_use)]
+#![allow(unused)]
 
 pub mod app;
 pub mod config;

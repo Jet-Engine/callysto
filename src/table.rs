@@ -7,6 +7,7 @@ use crate::stores::store::Store;
 use async_trait::async_trait;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
+use std::collections::HashMap;
 use std::sync::Arc;
 use url::Url;
 
@@ -15,7 +16,7 @@ pub struct CTable<State>
 where
     State: Clone + Send + Sync + 'static,
 {
-    storage_url: Option<Url>,
+    storage_url: Url,
     changelog_topic: CTopic,
     data: Arc<dyn Store<State>>,
 }
@@ -35,11 +36,16 @@ where
                 Ok(Arc::new(rdb))
             }
             "aerospikedb" | "aerospike" => todo!(),
+            "inmemory" => todo!(),
             storage_backend => Err(CallystoError::GeneralError(format!(
                 "Unknown storage backend: {}",
                 storage_backend
             ))),
         }
+    }
+
+    pub fn info(&self) -> HashMap<String, String> {
+        todo!()
     }
 }
 
@@ -59,8 +65,19 @@ where
         todo!()
     }
 
-    fn send_changelog(&self, partition: usize, key: &[u8], value: &[u8]) -> Result<()> {
-        todo!()
+    fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+        let topic = self.changelog_topic.clone();
+
+        bastion::executor::blocking(async move {
+            let producer = topic.producer();
+            let topic_name = topic.topic_name();
+            let key = key.clone();
+            let value = value.clone();
+
+            producer.send(topic_name, partition, key, value).await
+        });
+
+        Ok(())
     }
 }
 
@@ -74,7 +91,7 @@ where
     }
 
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {
-        todo!()
+        self.data.persisted_offset(tp)
     }
 
     fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()> {
@@ -82,11 +99,11 @@ where
     }
 
     fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()> {
-        todo!()
+        self.data.apply_changelog_batch(events)
     }
 
     fn reset_state(&self) -> Result<()> {
-        todo!()
+        self.data.reset_state()
     }
 
     async fn on_rebalance(
@@ -174,5 +191,5 @@ where
 
     fn changelog_topic_name(&self) -> String;
 
-    fn send_changelog(&self, partition: usize, key: &[u8], value: &[u8]) -> Result<()>;
+    fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
 }

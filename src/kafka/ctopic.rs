@@ -15,6 +15,7 @@ use rdkafka::ClientConfig;
 use tracing::error;
 
 use crate::kafka::cconsumer::CConsumer;
+use crate::kafka::cproducer::CProducer;
 use crate::kafka::runtime::BastionRuntime;
 
 #[derive(Clone)]
@@ -46,6 +47,10 @@ impl CTopic {
         consumer.subscribe(&[&self.topic]).unwrap();
 
         CConsumer { consumer }
+    }
+
+    pub fn producer(&self) -> CProducer {
+        CProducer::new(self.client_config.clone())
     }
 }
 
