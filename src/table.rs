@@ -14,7 +14,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::info;
 use url::Url;
+use crate::prelude::TableAgent;
 
 #[derive(Clone)]
 pub struct CTable<State = ()>
@@ -121,6 +123,7 @@ where
     }
 }
 
+#[async_trait]
 impl<State> Collection<State> for CTable<State>
 where
     State: Clone + Send + Sync + 'static,
@@ -137,10 +140,10 @@ where
         self.changelog_topic.topic_name()
     }
 
-    fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+    async fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         let topic = self.changelog_topic.clone();
 
-        bastion::executor::blocking(async move {
+        let handle = bastion::executor::blocking(async move {
             let producer = topic.producer();
             let topic_name = topic.topic_name();
             let key = key.clone();
@@ -148,6 +151,8 @@ where
 
             producer.send(topic_name, partition, key, value).await
         });
+
+        handle.await;
 
         Ok(())
     }
@@ -232,11 +237,23 @@ where
     State: Clone + Send + Sync + 'static,
 {
     async fn call(&self, st: Context<State>) -> Result<State> {
-        todo!()
+        Ok(st.state().clone())
     }
 
     async fn start(&'static self) -> Result<()> {
-        todo!()
+        println!("CTABLE");
+        let handle = bastion::executor::spawn(async move {
+            info!(
+                "Started - Table `{}` - Changelog Topic `{}`",
+                self.table_name,
+                self.changelog_topic_name()
+            );
+            self.data.start().await
+        });
+
+        handle.await;
+
+        Ok(())
     }
 
     async fn restart(&'static self) -> Result<()> {
@@ -296,7 +313,7 @@ where
 
     fn changelog_topic_name(&self) -> String;
 
-    fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
+    async fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
 
     fn partition_for_key(&self, key: Vec<u8>) -> Result<usize>;
 }

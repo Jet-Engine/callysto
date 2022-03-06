@@ -45,7 +45,6 @@ where
     agents: LOTable<usize, Arc<dyn Service<State>>>,
     tables: LOTable<String, Arc<CTable<State>>>,
     table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
-    topics: LOTable<usize, CTopic>,
 }
 
 impl Callysto<()> {
@@ -81,7 +80,6 @@ where
             agents: LOTable::default(),
             tables: LOTable::default(),
             table_agents: LOTable::default(),
-            topics: LOTable::default(),
         }
     }
 
@@ -134,18 +132,28 @@ where
         self
     }
 
-    pub fn table_agent(
+    pub fn table_agent<T: AsRef<str>, F, Fut>(
         &self,
+        name: T,
         topic: CTopic,
         tables: HashMap<String, CTable<State>>,
-        s: impl TableAgent<State>,
-    ) -> &Self {
+        clo: F
+    ) -> &Self
+        where
+            F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+            Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.table_agents.insert(stub, Arc::new(s));
-        tables.into_iter().for_each(|e| {
-            let _ = self.tables.insert(e.0, Arc::new(e.1));
-        });
-        self.topics.insert(stub, topic);
+        let table_agent = CTableAgent::new(
+            clo,
+            name.as_ref().to_string(),
+            self.app_name.clone(),
+            self.state.clone(),
+            topic,
+            tables,
+            Vec::default()
+        );
+        self.table_agents.insert(stub, Arc::new(table_agent));
         self
     }
 
@@ -320,52 +328,41 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let mut agents: Vec<RecoverableHandle<()>> = self.agents.iter().map(|(aid, agent)| {
-            info!("Starting Agent with ID: {}", aid);
-            let agent: Arc<dyn Service<State>> = agent.clone();
-            bastion::executor::spawn(async move {
-                // UNSAFE: This is end of the application.
-                // All services are running in a loop, it will only break if they crash.
-                let agent: &'static dyn Service<State> = unsafe { std::mem::transmute(&*agent) };
-                let _slow_drop = agent.start().await;
+        let mut agents: Vec<RecoverableHandle<()>> = self
+            .agents
+            .iter()
+            .map(|(aid, agent)| {
+                info!("Starting Agent with ID: {}", aid);
+                let agent: Arc<dyn Service<State>> = agent.clone();
+                bastion::executor::spawn(async move {
+                    // UNSAFE: This is end of the application.
+                    // All services are running in a loop, it will only break if they crash.
+                    let agent: &'static dyn Service<State> =
+                        unsafe { std::mem::transmute(&*agent) };
+                    let _slow_drop = agent.start().await;
+                })
             })
-        }).collect();
+            .collect();
 
-        // for (aid, agent) in self.agents.borrow().iter() {
-        //     info!("Starting Agent with ID: {}", aid);
-        //     let agent: Arc<dyn Service<State>> = agent.clone();
-        //     bastion::executor::spawn(async move {
-        //         // UNSAFE: This is end of the application.
-        //         // All services are running in a loop, it will only break if they crash.
-        //         let agent: &'static dyn Service<State> = unsafe { std::mem::transmute(&*agent) };
-        //         let _slow_drop = agent.start().await;
-        //     });
-        // }
+        let table_agents: Vec<RecoverableHandle<()>> = self
+            .table_agents
+            .iter()
+            .map(|(aid, agent)| {
+                info!("Starting Table Agent with ID: {}", aid);
+                let agent: Arc<dyn TableAgent<State>> = agent.clone();
+                bastion::executor::spawn(async move {
+                    // UNSAFE: This is end of the application.
+                    println!("STARTING");
+                    // All services are running in a loop, it will only break if they crash.
+                    let agent: &'static dyn Service<State> =
+                        unsafe { std::mem::transmute(&*agent) };
+                    println!("MAMACITA");
+                    let _slow_drop = agent.start().await;
+                })
+            })
+            .collect();
 
-        // let agents: Vec<RecoverableHandle<()>> = self
-        //     .agents
-        //     .iter()
-        //     .zip(self.topics.iter())
-        //     .map(|((_aid, agent), (_tid, topic))| {
-        //         let state = self.state.clone();
-        //         let consumer_group_name = self.app_name.clone();
-        //
-        //         bastion::executor::blocking(async move {
-        //             let consumer = topic.consumer();
-        //             info!(
-        //                 "Started - Consumer Group `{}` - Topic `{}`",
-        //                 consumer_group_name,
-        //                 topic.topic_name()
-        //             );
-        //             loop {
-        //                 let state = state.clone();
-        //                 let message = consumer.recv().await;
-        //                 let context = Context::new(state);
-        //                 let _slow_drop = agent.call(message, context).await.unwrap();
-        //             }
-        //         })
-        //     })
-        //     .collect();
+        agents.extend(table_agents);
 
         bastion::executor::run(join_all(agents));
     }

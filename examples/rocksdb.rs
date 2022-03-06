@@ -27,14 +27,14 @@ fn main() {
     let mut app = Callysto::default();
     // Configure application.
     app.with_name("durable-app")
-        .with_storage("rocksdb:///home/theo/projects/calstorage");
+        .with_storage("rocksdb:///home/vertexclique/projects/calstorage");
 
     // Create all the tables that we need.
     let mut tables = Tables::new();
     tables.insert("odd_numbers".into(), app.table("odd_numbers"));
     tables.insert("even_numbers".into(), app.table("even_numbers"));
 
-    app.table_agent(app.topic("example"), tables, counter_agent);
+    app.table_agent("counter_agent", app.topic("example"), tables, counter_agent);
 
     app.run();
 }

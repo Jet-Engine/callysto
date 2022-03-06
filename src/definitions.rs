@@ -14,14 +14,9 @@ use tracing::info;
 
 pub type Tables<State> = HashMap<String, CTable<State>>;
 
-#[async_trait]
-pub trait Task<State>: Send + Sync + 'static
-where
-    State: Clone + Send + Sync + 'static,
-{
-    /// Execute the given task with state passed in
-    async fn call(&self, st: Context<State>) -> CResult<State>;
-}
+///////////////////////////////////////////////////
+//////// CAgent
+///////////////////////////////////////////////////
 
 pub struct CAgent<State, F, Fut>
 where
@@ -89,15 +84,6 @@ where
         Ok(res.into())
     }
 }
-
-// #[async_trait]
-// impl<State, F, Fut> Service<State> for
-// where
-//     State: Clone + Send + Sync + 'static,
-//     F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-//     Fut: Future<Output = Result<State>> + Send + 'static,
-// {
-// }
 
 #[async_trait]
 impl<State, F, Fut> Service<State> for CAgent<State, F, Fut>
@@ -178,24 +164,72 @@ where
     }
 }
 
+///////////////////////////////////////////////////
+//////// CTableAgent
+///////////////////////////////////////////////////
+
+pub struct CTableAgent<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    clo: F,
+    app_name: String,
+    agent_name: String,
+    state: State,
+    topic: CTopic,
+    tables: Tables<State>,
+    dependencies: Vec<Arc<dyn Service<State>>>,
+}
+
+impl<State, F, Fut> CTableAgent<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    pub fn new(
+        clo: F,
+        app_name: String,
+        agent_name: String,
+        state: State,
+        topic: CTopic,
+        tables: Tables<State>,
+        dependencies: Vec<Arc<dyn Service<State>>>,
+    ) -> Self {
+        Self {
+            clo,
+            app_name,
+            agent_name,
+            state,
+            topic,
+            tables,
+            dependencies,
+        }
+    }
+
+    pub fn topic(&self) -> CTopic {
+        self.topic.clone()
+    }
+}
+
 #[async_trait]
 pub trait TableAgent<State>: Send + Sync + 'static
 where
     State: Clone + Send + Sync + 'static,
 {
-    /// Do work on given message with state passed in
+    /// Do work on given message, tables with state passed in
     async fn call(
         &self,
         msg: Option<OwnedMessage>,
         tables: Tables<State>,
         st: Context<State>,
     ) -> CResult<()>;
-    //
-    // fn topic(&self) -> CTopic;
 }
 
 #[async_trait]
-impl<State, F, Fut> TableAgent<State> for F
+impl<State, F, Fut> TableAgent<State> for CTableAgent<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
     F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
@@ -207,14 +241,104 @@ where
         tables: Tables<State>,
         req: Context<State>,
     ) -> CResult<()> {
-        let fut = (self)(msg, tables, req);
+        let fut = (self.clo)(msg, tables, req);
         let res = fut.await?;
         Ok(res.into())
     }
+}
 
-    // fn topic(&self) -> CTopic {
-    //     todo!()
-    // }
+#[async_trait]
+impl<State, F, Fut> Service<State> for CTableAgent<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    async fn call(&self, st: Context<State>) -> Result<State> {
+        Ok(self.state.clone())
+    }
+
+    async fn start(&'static self) -> Result<()> {
+        println!("CTableAgent");
+        for (table_name, table) in &self.tables {
+            table.start().await;
+        }
+
+        let handle = bastion::executor::spawn(async move {
+            let consumer = self.topic.consumer();
+            info!(
+                "Started Table Agent- Consumer Group `{}` - Topic `{}`",
+                self.app_name,
+                self.topic.topic_name()
+            );
+            loop {
+                let state = self.state.clone();
+                let tables = self.tables.clone();
+                let message = consumer.recv().await;
+                let context = Context::new(state);
+                let _slow_drop = <Self as TableAgent<State>>::call(self, message, tables, context)
+                    .await
+                    .unwrap();
+            }
+        });
+
+        handle.await;
+
+        Ok(())
+    }
+
+    async fn restart(&'static self) -> Result<()> {
+        todo!()
+    }
+
+    async fn crash(&self) {
+        todo!()
+    }
+
+    async fn stop(&self) -> Result<()> {
+        todo!()
+    }
+
+    async fn wait_until_stopped(&self) {
+        todo!()
+    }
+
+    async fn started(&self) -> bool {
+        todo!()
+    }
+
+    async fn crashed(&self) -> bool {
+        todo!()
+    }
+
+    async fn state(&self) -> String {
+        todo!()
+    }
+
+    async fn label(&self) -> String {
+        todo!()
+    }
+
+    async fn shortlabel(&self) -> String {
+        todo!()
+    }
+
+    async fn service_state(&self) -> Arc<ServiceState> {
+        todo!()
+    }
+}
+
+///////////////////////////////////////////////////
+//////// CTask
+///////////////////////////////////////////////////
+
+#[async_trait]
+pub trait Task<State>: Send + Sync + 'static
+where
+    State: Clone + Send + Sync + 'static,
+{
+    /// Execute the given task with state passed in
+    async fn call(&self, st: Context<State>) -> CResult<State>;
 }
 
 #[async_trait]
@@ -231,12 +355,20 @@ where
     }
 }
 
+///////////////////////////////////////////////////
+//////// CService (Custom Service)
+///////////////////////////////////////////////////
+
 pub struct CService<State>
 where
     State: Clone + Send + Sync + 'static,
 {
     dependencies: Vec<Arc<dyn Service<State>>>,
 }
+
+///////////////////////////////////////////////////
+//////// CronJob
+///////////////////////////////////////////////////
 
 pub struct CronJob<State> {
     cron_expr: String,
@@ -254,6 +386,10 @@ where
         }
     }
 }
+
+///////////////////////////////////////////////////
+//////// Context
+///////////////////////////////////////////////////
 
 ///
 /// Context passed to every closure of every module definition

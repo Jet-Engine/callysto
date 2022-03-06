@@ -73,8 +73,16 @@ fn main() {
     let mut app = Callysto::with_state(SharedState::new());
 
     app.with_name("double-agent");
-    app.agent("counter_agent_1", app.topic("double-agent-1"), counter_agent_1)
-        .agent("counter_agent_2", app.topic("double-agent-2"), counter_agent_2);
+    app.agent(
+        "counter_agent_1",
+        app.topic("double-agent-1"),
+        counter_agent_1,
+    )
+    .agent(
+        "counter_agent_2",
+        app.topic("double-agent-2"),
+        counter_agent_2,
+    );
 
     app.run();
 }

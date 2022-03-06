@@ -273,7 +273,8 @@ where
     }
 
     async fn start(&'static self) -> Result<()> {
-        todo!()
+        info!("Rocksdb backend is started.");
+        Ok(())
     }
 
     async fn restart(&'static self) -> Result<()> {
@@ -349,45 +350,6 @@ where
         let db = self.db_for_partition(partition)?;
         Ok(db.delete(serialized_key.as_slice())?)
     }
-
-    // fn get<K, V>(&self, key: K, msg: OwnedMessage) -> Result<Option<V>>
-    // where
-    //     Self: Sized,
-    //     K: Serialize,
-    //     V: DeserializeOwned,
-    // {
-    //     let partition: usize = msg.partition() as _;
-    //     let db = self.db_for_partition(partition)?;
-    //     let serialized_key = bincode::serialize(&key)?;
-    //     match db.get(serialized_key.as_slice())? {
-    //         Some(x) => Ok(Some(bincode::deserialize::<V>(x.as_slice())?)),
-    //         _ => Ok(None),
-    //     }
-    // }
-    //
-    // fn set<K, V>(&self, key: K, value: V, msg: OwnedMessage) -> Result<()>
-    // where
-    //     Self: Sized,
-    //     K: Serialize,
-    //     V: Serialize,
-    // {
-    //     let partition: usize = msg.partition() as _;
-    //     let db = self.db_for_partition(partition)?;
-    //     let serialized_key = bincode::serialize(&key)?;
-    //     let serialized_val = bincode::serialize(&value)?;
-    //     Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
-    // }
-    //
-    // fn del<K>(&self, key: K, msg: OwnedMessage) -> Result<()>
-    // where
-    //     Self: Sized,
-    //     K: Serialize,
-    // {
-    //     let partition: usize = msg.partition() as _;
-    //     let db = self.db_for_partition(partition)?;
-    //     let serialized_key = bincode::serialize(&key)?;
-    //     Ok(db.delete(serialized_key.as_slice())?)
-    // }
 
     fn table(&self) -> CTable<State> {
         todo!()
