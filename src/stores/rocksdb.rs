@@ -18,6 +18,7 @@ use rocksdb::{
     BlockBasedOptions, Cache, DBPath, DBWithThreadMode, Error, Options as DBOptions,
     SingleThreaded, WriteBatch, DB,
 };
+use serde::Serialize;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::convert::{identity, TryFrom, TryInto};
@@ -119,6 +120,28 @@ impl RocksDbStore {
         };
         rds.set_db_options();
         rds
+    }
+
+    pub fn get<K, V>(&self, key: K) -> Result<V>
+    where
+        K: Serialize,
+    {
+        todo!()
+    }
+
+    pub fn set<K, V>(&self, key: K, value: V) -> Result<()>
+    where
+        K: Serialize,
+        V: Serialize,
+    {
+        todo!()
+    }
+
+    pub fn del<K>(&self, key: K) -> Result<()>
+    where
+        K: Serialize,
+    {
+        todo!()
     }
 
     pub fn set_db_options(&mut self) {

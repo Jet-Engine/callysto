@@ -7,6 +7,7 @@ use std::time::Duration;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_timer::Delay;
+use lever::sync::atomics::AtomicBox;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
@@ -51,6 +52,20 @@ impl CTopic {
 
     pub fn producer(&self) -> CProducer {
         CProducer::new(self.client_config.clone())
+    }
+
+    pub fn client_config(&self) -> ClientConfig {
+        self.client_config.clone()
+    }
+
+    pub fn topic_declare(
+        &self,
+        compacting: bool,
+        deleting: bool,
+        retention: f64,
+        partitions: usize,
+    ) {
+        todo!()
     }
 }
 

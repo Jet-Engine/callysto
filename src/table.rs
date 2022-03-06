@@ -1,22 +1,27 @@
+use crate::config::Config;
 use crate::definitions::Context;
 use crate::errors::*;
 use crate::kafka::ctopic::{CTopic, CTP};
+use crate::kafka::enums::ProcessingGuarantee;
 use crate::service::{Service, ServiceState};
 use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
 use async_trait::async_trait;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use url::Url;
 
 #[derive(Clone)]
-pub struct CTable<State>
+pub struct CTable<State = ()>
 where
     State: Clone + Send + Sync + 'static,
 {
+    table_name: String,
     storage_url: Url,
+    config: Config,
     changelog_topic: CTopic,
     data: Arc<dyn Store<State>>,
 }
@@ -25,7 +30,29 @@ impl<State> CTable<State>
 where
     State: Clone + Send + Sync + 'static,
 {
-    pub fn new(storage_url: Url, table_name: String) -> Self {
+    pub fn new(storage_url: Url, table_name: String, config: Config) -> Self {
+        todo!()
+    }
+
+    pub fn get<K, V>(&self, key: K) -> Result<V>
+    where
+        K: Serialize,
+    {
+        todo!()
+    }
+
+    pub fn set<K, V>(&self, key: K, value: V) -> Result<()>
+    where
+        K: Serialize,
+        V: Serialize,
+    {
+        todo!()
+    }
+
+    pub fn del<K>(&self, key: K) -> Result<()>
+    where
+        K: Serialize,
+    {
         todo!()
     }
 
@@ -42,6 +69,18 @@ where
                 storage_backend
             ))),
         }
+    }
+
+    fn on_changelog_sent(&self) -> Result<()> {
+        match self.config.processing_guarantee {
+            ProcessingGuarantee::AtLeastOnce => {
+                todo!()
+            }
+            ProcessingGuarantee::ExactlyOnce => {
+                todo!()
+            }
+        }
+        todo!()
     }
 
     pub fn info(&self) -> HashMap<String, String> {
@@ -62,7 +101,7 @@ where
     }
 
     fn changelog_topic_name(&self) -> String {
-        todo!()
+        self.changelog_topic.topic_name()
     }
 
     fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
@@ -78,6 +117,10 @@ where
         });
 
         Ok(())
+    }
+
+    fn partition_for_key(&self, key: Vec<u8>) -> Result<usize> {
+        todo!()
     }
 }
 
@@ -95,7 +138,7 @@ where
     }
 
     fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()> {
-        todo!()
+        self.data.set_persisted_offset(tp, offset)
     }
 
     fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()> {
@@ -106,6 +149,7 @@ where
         self.data.reset_state()
     }
 
+    /// Call when cluster is rebalancing.
     async fn on_rebalance(
         &self,
         assigned: Vec<CTP>,
@@ -113,14 +157,21 @@ where
         newly_assigned: Vec<CTP>,
         generation_id: usize,
     ) -> Result<()> {
-        todo!()
+        self.data
+            .on_rebalance(assigned, revoked, newly_assigned, generation_id)
+            .await
     }
 
+    /// Call when recovery has completed after rebalancing.
     async fn on_recovery_completed(
         &self,
         active_tps: Vec<CTP>,
         standby_tps: Vec<CTP>,
     ) -> Result<()> {
+        self.data
+            .on_recovery_completed(active_tps, standby_tps)
+            .await;
+        // self.call_recover_callbacks()
         todo!()
     }
 }
@@ -167,11 +218,15 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!(
+            "{}@{}",
+            self.shortlabel().await,
+            self.data.shortlabel().await
+        )
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
+        format!("Table: {}", self.table_name)
     }
 
     async fn service_state(&self) -> Arc<ServiceState> {
@@ -192,4 +247,6 @@ where
     fn changelog_topic_name(&self) -> String;
 
     fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
+
+    fn partition_for_key(&self, key: Vec<u8>) -> Result<usize>;
 }

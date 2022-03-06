@@ -1,7 +1,7 @@
 use rdkafka::consumer::ConsumerContext;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ProcessingGuarantee {
     AtLeastOnce,
     ExactlyOnce,
@@ -17,7 +17,7 @@ impl fmt::Display for ProcessingGuarantee {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum IsolationLevel {
     ReadUncommitted,
     ReadCommitted,
@@ -33,7 +33,7 @@ impl fmt::Display for IsolationLevel {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OffsetReset {
     Earliest,
     Latest,
@@ -58,7 +58,7 @@ pub enum PartitionAssignment {
 
 ///
 /// Security Protocol
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SecurityProtocol {
     Plaintext,
     Ssl,

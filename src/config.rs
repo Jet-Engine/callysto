@@ -1,5 +1,6 @@
 use crate::kafka::enums::*;
 
+#[derive(Clone)]
 pub struct Config {
     ///
     /// Daemonize the service

@@ -1,43 +1,31 @@
 use callysto::prelude::message::*;
 use callysto::prelude::*;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 
-#[derive(Clone)]
-struct SharedState {
-    value: Arc<AtomicU32>,
-}
-
-impl SharedState {
-    fn new() -> Self {
-        Self {
-            value: Arc::new(AtomicU32::new(0)),
-        }
-    }
-}
-
-async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
+async fn counter_agent(
+    msg: Option<OwnedMessage>,
+    table: CTable<()>,
+    ctx: Context<()>,
+) -> Result<()> {
     // Read the incoming bytes as string
     msg.map(|m| {
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
         println!("Received payload: `{}`", strm);
     });
 
-    // Increment message counter and print it.
-    // Show how you can store a application state.
-    let state = ctx.state();
-    let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
-    println!("Message count: `{}`", msgcount);
-
     Ok(())
 }
 
 fn main() {
-    let mut app = Callysto::with_state(SharedState::new());
+    let mut app = Callysto::default();
 
-    app.with_name("basic-app")
-        .with_storage("memory:///home/theo/projects/callysto");
-    app.agent(app.topic("example"), counter_agent);
+    app.with_name("durable-app")
+        .with_storage("rocksdb:///home/theo/projects/calstorage");
+
+    app.durable_agent(
+        app.topic("example"),
+        app.table("odd_numbers"),
+        counter_agent,
+    );
 
     app.run();
 }

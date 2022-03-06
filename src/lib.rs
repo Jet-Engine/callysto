@@ -11,6 +11,7 @@ pub mod kafka;
 pub mod service;
 pub mod table;
 
+mod runtime;
 mod stores;
 
 pub use rdkafka;

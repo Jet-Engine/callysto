@@ -1,6 +1,7 @@
 use crate::errors::Result as CResult;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
+use crate::table::CTable;
 use async_trait::*;
 use futures::future::TryFutureExt;
 use rdkafka::message::OwnedMessage;
@@ -26,6 +27,45 @@ where
     async fn call(&self, msg: Option<OwnedMessage>, st: Context<State>) -> CResult<()>;
     //
     // fn topic(&self) -> CTopic;
+}
+
+#[async_trait]
+pub trait DurableAgent<State>: Send + Sync + 'static
+where
+    State: Clone + Send + Sync + 'static,
+{
+    /// Do work on given message with state passed in
+    async fn call(
+        &self,
+        msg: Option<OwnedMessage>,
+        table: CTable<State>,
+        st: Context<State>,
+    ) -> CResult<()>;
+    //
+    // fn topic(&self) -> CTopic;
+}
+
+#[async_trait]
+impl<State, F, Fut> DurableAgent<State> for F
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, CTable<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    async fn call(
+        &self,
+        msg: Option<OwnedMessage>,
+        table: CTable<State>,
+        req: Context<State>,
+    ) -> CResult<()> {
+        let fut = (self)(msg, table, req);
+        let res = fut.await?;
+        Ok(res.into())
+    }
+
+    // fn topic(&self) -> CTopic {
+    //     todo!()
+    // }
 }
 
 #[async_trait]

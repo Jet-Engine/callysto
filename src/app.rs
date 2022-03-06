@@ -111,6 +111,15 @@ where
         self
     }
 
+    pub fn durable_agent(
+        &self,
+        topic: CTopic,
+        table: CTable<State>,
+        s: impl DurableAgent<State>,
+    ) -> &Self {
+        todo!()
+    }
+
     pub fn service(&self, s: impl Service<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
@@ -254,7 +263,7 @@ where
         cc
     }
 
-    pub fn table(&self, table_name: String) -> CTable<State> {
+    pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {
         todo!()
     }
 
