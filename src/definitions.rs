@@ -115,7 +115,7 @@ where
             x.start().await;
         }
 
-        let handle = bastion::executor::blocking(async move {
+        let handle = bastion::executor::spawn(async move {
             let consumer = self.topic.consumer();
             info!(
                 "Started - Consumer Group `{}` - Topic `{}`",

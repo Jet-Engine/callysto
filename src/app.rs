@@ -320,7 +320,7 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let agents: Vec<RecoverableHandle<()>> = self.agents.iter().map(|(aid, agent)| {
+        let mut agents: Vec<RecoverableHandle<()>> = self.agents.iter().map(|(aid, agent)| {
             info!("Starting Agent with ID: {}", aid);
             let agent: Arc<dyn Service<State>> = agent.clone();
             bastion::executor::spawn(async move {
