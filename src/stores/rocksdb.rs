@@ -272,11 +272,11 @@ where
         todo!()
     }
 
-    async fn start(&self) -> Result<()> {
+    async fn start(&'static self) -> Result<()> {
         todo!()
     }
 
-    async fn restart(&self) -> Result<()> {
+    async fn restart(&'static self) -> Result<()> {
         <Self as Service<State>>::stop(self)
             .and_then(|_| <Self as Service<State>>::start(self))
             .await

@@ -26,9 +26,9 @@ where
     /// Execute the given task with state passed in
     async fn call(&self, st: Context<State>) -> Result<State>;
 
-    async fn start(&self) -> Result<()>;
+    async fn start(&'static self) -> Result<()>;
 
-    async fn restart(&self) -> Result<()>;
+    async fn restart(&'static self) -> Result<()>;
 
     async fn crash(&self);
 
@@ -50,60 +50,60 @@ where
     async fn service_state(&self) -> Arc<ServiceState>;
 }
 
-#[async_trait]
-impl<State, F, Fut> Service<State> for F
-where
-    State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-    Fut: Future<Output = Result<State>> + Send + 'static,
-{
-    async fn call(&self, req: Context<State>) -> Result<State> {
-        let fut = (self)(req);
-        let res = fut.await?;
-        Ok(res.into())
-    }
-
-    async fn start(&self) -> Result<()> {
-        todo!()
-    }
-
-    async fn restart(&self) -> Result<()> {
-        self.stop().and_then(|_| self.start()).await
-    }
-
-    async fn crash(&self) {
-        todo!()
-    }
-
-    async fn stop(&self) -> Result<()> {
-        todo!()
-    }
-
-    async fn wait_until_stopped(&self) {
-        let _ = self.stop().await;
-    }
-
-    async fn service_state(&self) -> Arc<ServiceState> {
-        unimplemented!("Service state needs to be implemented")
-    }
-
-    async fn started(&self) -> bool {
-        todo!()
-    }
-
-    async fn crashed(&self) -> bool {
-        todo!()
-    }
-
-    async fn state(&self) -> String {
-        todo!()
-    }
-
-    async fn label(&self) -> String {
-        todo!()
-    }
-
-    async fn shortlabel(&self) -> String {
-        todo!()
-    }
-}
+// #[async_trait]
+// impl<State, F, Fut> Service<State> for F
+// where
+//     State: Clone + Send + Sync + 'static,
+//     F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+//     Fut: Future<Output = Result<State>> + Send + 'static,
+// {
+//     async fn call(&self, req: Context<State>) -> Result<State> {
+//         let fut = (self)(req);
+//         let res = fut.await?;
+//         Ok(res.into())
+//     }
+//
+//     async fn start(&self) -> Result<()> {
+//         todo!()
+//     }
+//
+//     async fn restart(&self) -> Result<()> {
+//         self.stop().and_then(|_| self.start()).await
+//     }
+//
+//     async fn crash(&self) {
+//         todo!()
+//     }
+//
+//     async fn stop(&self) -> Result<()> {
+//         todo!()
+//     }
+//
+//     async fn wait_until_stopped(&self) {
+//         let _ = self.stop().await;
+//     }
+//
+//     async fn started(&self) -> bool {
+//         todo!()
+//     }
+//
+//     async fn crashed(&self) -> bool {
+//         todo!()
+//     }
+//
+//     async fn state(&self) -> String {
+//         todo!()
+//     }
+//
+//     async fn label(&self) -> String {
+//         todo!()
+//     }
+//
+//     async fn shortlabel(&self) -> String {
+//         todo!()
+//     }
+//
+//     async fn service_state(&self) -> Arc<ServiceState> {
+//         unimplemented!("Service state needs to be implemented")
+//     }
+// }

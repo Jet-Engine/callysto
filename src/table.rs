@@ -9,6 +9,7 @@ use crate::stores::store::Store;
 use async_trait::async_trait;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
+use rdkafka::ClientConfig;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -31,8 +32,25 @@ impl<State> CTable<State>
 where
     State: Clone + Send + Sync + 'static,
 {
-    pub fn new(storage_url: Url, table_name: String, config: Config) -> Self {
-        todo!()
+    pub fn new(
+        app_name: String,
+        storage_url: Url,
+        table_name: String,
+        config: Config,
+        client_config: ClientConfig,
+    ) -> Result<Self> {
+        let data = Self::new_storage(storage_url.clone(), table_name.clone())?;
+        let changelog_topic = CTopic::new(
+            format!("{}-{}-changelog", app_name, table_name),
+            client_config,
+        );
+        Ok(Self {
+            table_name,
+            storage_url,
+            config,
+            changelog_topic,
+            data,
+        })
     }
 
     ///
@@ -71,7 +89,7 @@ where
         self.data.del(serialized_key, msg)
     }
 
-    pub fn new_storage(storage_url: Url, table_name: String) -> Result<Arc<dyn Store<State>>> {
+    fn new_storage(storage_url: Url, table_name: String) -> Result<Arc<dyn Store<State>>> {
         match storage_url.scheme().to_lowercase().as_str() {
             "rocksdb" | "rocks" => {
                 let rdb = RocksDbStore::new(storage_url, table_name);
@@ -217,11 +235,11 @@ where
         todo!()
     }
 
-    async fn start(&self) -> Result<()> {
+    async fn start(&'static self) -> Result<()> {
         todo!()
     }
 
-    async fn restart(&self) -> Result<()> {
+    async fn restart(&'static self) -> Result<()> {
         todo!()
     }
 

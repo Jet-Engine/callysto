@@ -8,7 +8,7 @@ async def produce_message(topic: str, message: str):
     producer = aiokafka.AIOKafkaProducer(bootstrap_servers='localhost:9092')
     await producer.start()
     try:
-        for x in range(0, 100_000):
+        for x in range(0, 1_000):
             await producer.send_and_wait(topic, message.encode())
     finally:
         await producer.stop()

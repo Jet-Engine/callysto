@@ -36,7 +36,7 @@ fn main() {
     let mut app = Callysto::with_state(SharedState::new());
 
     app.with_name("basic-app");
-    app.agent(app.topic("example"), counter_agent);
+    app.agent("counter_agent", app.topic("example"), counter_agent);
 
     app.run();
 }

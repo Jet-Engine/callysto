@@ -1,4 +1,7 @@
+use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::default::Default;
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -16,14 +19,17 @@ use tracing_subscriber::{self, fmt, EnvFilter};
 use url::Url;
 
 use crate::definitions::*;
+use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::BastionRuntime};
 use crate::prelude::{Config, CronJob};
 use crate::service::Service;
-use crate::table::CTable;
+use crate::table::{CTable, Collection};
+
+// TODO: not sure static dispatch is better here. Check on using State: 'static.
 
 pub struct Callysto<State>
 where
-    State: 'static,
+    State: Clone + Send + Sync + 'static,
 {
     app_name: String,
     state: State,
@@ -31,11 +37,14 @@ where
     brokers: String,
     config: Config,
     stubs: Arc<AtomicUsize>,
+    stub_lookup: LOTable<usize, String>,
     tasks: LOTable<usize, Arc<dyn Task<State>>>,
     timers: LOTable<usize, Arc<dyn Task<State>>>,
     cronjobs: LOTable<usize, Arc<CronJob<State>>>,
     services: LOTable<usize, Arc<dyn Service<State>>>,
-    agents: LOTable<usize, Arc<dyn Agent<State>>>,
+    agents: LOTable<usize, Arc<dyn Service<State>>>,
+    tables: LOTable<String, Arc<CTable<State>>>,
+    table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
     topics: LOTable<usize, CTopic>,
 }
 
@@ -62,6 +71,7 @@ where
             state,
             storage_url: None,
             stubs: Arc::new(AtomicUsize::default()),
+            stub_lookup: LOTable::default(),
             brokers: "localhost:9092".to_owned(),
             config: Config::default(),
             tasks: LOTable::default(),
@@ -69,6 +79,8 @@ where
             cronjobs: LOTable::default(),
             services: LOTable::default(),
             agents: LOTable::default(),
+            tables: LOTable::default(),
+            table_agents: LOTable::default(),
             topics: LOTable::default(),
         }
     }
@@ -104,20 +116,37 @@ where
         self
     }
 
-    pub fn agent(&self, topic: CTopic, s: impl Agent<State>) -> &Self {
+    pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.agents.insert(stub, Arc::new(s));
-        self.topics.insert(stub, topic);
+        let agent = CAgent::new(
+            clo,
+            name.as_ref().to_string(),
+            self.app_name.clone(),
+            self.state.clone(),
+            topic,
+            Vec::default(),
+        );
+        self.agents.insert(stub, Arc::new(agent));
         self
     }
 
     pub fn table_agent(
         &self,
         topic: CTopic,
-        table: CTable<State>,
+        tables: HashMap<String, CTable<State>>,
         s: impl TableAgent<State>,
     ) -> &Self {
-        todo!()
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        self.table_agents.insert(stub, Arc::new(s));
+        tables.into_iter().for_each(|e| {
+            let _ = self.tables.insert(e.0, Arc::new(e.1));
+        });
+        self.topics.insert(stub, topic);
+        self
     }
 
     pub fn service(&self, s: impl Service<State>) -> &Self {
@@ -133,10 +162,17 @@ where
         self
     }
 
+    // You have searched for "Mutex", "CondVar" or "RwLock". You won't find them.
+
     pub fn topic<T>(&self, topic: T) -> CTopic
     where
         T: AsRef<str>,
     {
+        let cc = self.build_client_config();
+        CTopic::new(topic, cc)
+    }
+
+    fn build_client_config(&self) -> ClientConfig {
         let mut cc = ClientConfig::new();
 
         cc.set("bootstrap.servers", &*self.brokers)
@@ -211,8 +247,7 @@ where
             }
             _ => cc,
         };
-
-        CTopic::new(topic, cc)
+        cc
     }
 
     fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
@@ -264,7 +299,17 @@ where
     }
 
     pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {
-        todo!()
+        if self.storage_url.is_none() {
+            panic!("Tables can't be used without storage backend. Bailing...");
+        }
+        CTable::new(
+            self.app_name.clone(),
+            self.storage_url.clone().unwrap(),
+            table_name.as_ref().into(),
+            self.config.clone(),
+            self.build_client_config(),
+        )
+        .expect("Table build failed.")
     }
 
     // TODO: page method to serve
@@ -275,30 +320,52 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let agents: Vec<RecoverableHandle<()>> = self
-            .agents
-            .iter()
-            .zip(self.topics.iter())
-            .map(|((_aid, agent), (_tid, topic))| {
-                let state = self.state.clone();
-                let consumer_group_name = self.app_name.clone();
-
-                bastion::executor::blocking(async move {
-                    let consumer = topic.consumer();
-                    info!(
-                        "Started - Consumer Group `{}` - Topic `{}`",
-                        consumer_group_name,
-                        topic.topic_name()
-                    );
-                    loop {
-                        let state = state.clone();
-                        let message = consumer.recv().await;
-                        let context = Context::new(state);
-                        let _slow_drop = agent.call(message, context).await.unwrap();
-                    }
-                })
+        let agents: Vec<RecoverableHandle<()>> = self.agents.iter().map(|(aid, agent)| {
+            info!("Starting Agent with ID: {}", aid);
+            let agent: Arc<dyn Service<State>> = agent.clone();
+            bastion::executor::spawn(async move {
+                // UNSAFE: This is end of the application.
+                // All services are running in a loop, it will only break if they crash.
+                let agent: &'static dyn Service<State> = unsafe { std::mem::transmute(&*agent) };
+                let _slow_drop = agent.start().await;
             })
-            .collect();
+        }).collect();
+
+        // for (aid, agent) in self.agents.borrow().iter() {
+        //     info!("Starting Agent with ID: {}", aid);
+        //     let agent: Arc<dyn Service<State>> = agent.clone();
+        //     bastion::executor::spawn(async move {
+        //         // UNSAFE: This is end of the application.
+        //         // All services are running in a loop, it will only break if they crash.
+        //         let agent: &'static dyn Service<State> = unsafe { std::mem::transmute(&*agent) };
+        //         let _slow_drop = agent.start().await;
+        //     });
+        // }
+
+        // let agents: Vec<RecoverableHandle<()>> = self
+        //     .agents
+        //     .iter()
+        //     .zip(self.topics.iter())
+        //     .map(|((_aid, agent), (_tid, topic))| {
+        //         let state = self.state.clone();
+        //         let consumer_group_name = self.app_name.clone();
+        //
+        //         bastion::executor::blocking(async move {
+        //             let consumer = topic.consumer();
+        //             info!(
+        //                 "Started - Consumer Group `{}` - Topic `{}`",
+        //                 consumer_group_name,
+        //                 topic.topic_name()
+        //             );
+        //             loop {
+        //                 let state = state.clone();
+        //                 let message = consumer.recv().await;
+        //                 let context = Context::new(state);
+        //                 let _slow_drop = agent.call(message, context).await.unwrap();
+        //             }
+        //         })
+        //     })
+        //     .collect();
 
         bastion::executor::run(join_all(agents));
     }
