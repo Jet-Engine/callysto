@@ -4,11 +4,10 @@
 #![allow(unused)]
 
 pub mod app;
+pub mod types;
 pub mod config;
-pub mod definitions;
 pub mod errors;
 pub mod kafka;
-pub mod service;
 pub mod table;
 
 mod runtime;
@@ -19,7 +18,7 @@ pub use rdkafka;
 pub mod prelude {
     pub use super::app::*;
     pub use super::config::*;
-    pub use super::definitions::*;
+    pub use crate::types::prelude::*;
     pub use super::errors::*;
     pub use super::kafka::*;
     pub use super::rdkafka::*;

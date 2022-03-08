@@ -1,10 +1,10 @@
 use crate::config::Config;
-use crate::definitions::Context;
+use crate::types::context::Context;
 use crate::errors::*;
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
-use crate::prelude::TableAgent;
-use crate::service::{Service, ServiceState};
+use crate::types::table_agent::TableAgent;
+use crate::types::service::{Service, ServiceState};
 use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
 use async_trait::async_trait;
@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 use url::Url;
+use crate::types::collection::Collection;
 
 #[derive(Clone)]
 pub struct CTable<State = ()>
@@ -302,21 +303,4 @@ where
     async fn service_state(&self) -> Arc<ServiceState> {
         todo!()
     }
-}
-
-#[async_trait]
-pub trait Collection<State>: Store<State>
-where
-    State: Clone + Send + Sync + 'static,
-{
-    /// Get changelog topic
-    fn changelog_topic(&self) -> CTopic;
-
-    fn set_changelog_topic(&self, changelog_topic: CTopic);
-
-    fn changelog_topic_name(&self) -> String;
-
-    async fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
-
-    fn partition_for_key(&self, key: Vec<u8>) -> Result<usize>;
 }

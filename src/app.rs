@@ -20,12 +20,16 @@ use tracing::{error, info};
 use tracing_subscriber::{self, fmt, EnvFilter};
 use url::Url;
 
-use crate::definitions::*;
+use crate::types::context::*;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::BastionRuntime};
-use crate::prelude::{Config, CronJob};
-use crate::service::Service;
-use crate::table::{CTable, Collection};
+use crate::config::Config;
+use crate::table::CTable;
+use crate::types::agent::{Agent, CAgent};
+use crate::types::cronjob::CronJob;
+use crate::types::service::Service;
+use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
+use crate::types::task::Task;
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
