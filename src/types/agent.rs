@@ -113,22 +113,30 @@ where
                 self.topic.topic_name()
             );
 
-            loop {
+            'fallback: loop {
                 info!("Launched CAgent executor.");
+                self.service_state()
+                    .await
+                    .replace_with(|e| ServiceState::Running);
                 'main: loop {
+                    if self.stopped().await {
+                        break 'main;
+                    }
                     let message = consumer.recv().await;
                     let state = state.clone();
                     let context = Context::new(state);
                     match Agent::<State>::call(self, message, context).await {
                         Err(e) => {
                             error!("CAgent failed: {}", e);
-                            self.service_state()
-                                .await
-                                .replace_with(|e| ServiceState::Crashed);
+                            self.crash().await;
                             break 'main;
                         }
                         _ => {}
                     }
+                }
+
+                if self.stopped().await {
+                    break 'fallback;
                 }
             }
         };
@@ -137,11 +145,16 @@ where
     }
 
     async fn restart(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Restarting);
         todo!()
     }
 
     async fn crash(&self) {
-        todo!()
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Crashed);
     }
 
     async fn stop(&self) -> Result<()> {
@@ -153,11 +166,15 @@ where
     }
 
     async fn started(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Running
+    }
+
+    async fn stopped(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Stopped
     }
 
     async fn crashed(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -165,11 +182,11 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!("{}@{}", self.app_name, self.shortlabel().await)
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
+        format!("agent:{}", self.agent_name)
     }
 
     async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {

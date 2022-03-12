@@ -126,9 +126,16 @@ where
                 self.app_name,
                 self.topic.topic_name()
             );
-            loop {
+            self.service_state()
+                .await
+                .replace_with(|e| ServiceState::Running);
+
+            'fallback: loop {
+                info!("Launched CTableAgent executor.");
                 'main: loop {
-                    info!("Launched CTableAgent executor.");
+                    if self.stopped().await {
+                        break 'main;
+                    }
                     let state = self.state.clone();
                     let tables = self.tables.clone();
                     let message = consumer.recv().await;
@@ -136,10 +143,15 @@ where
                     match TableAgent::<State>::call(self, message, tables, context).await {
                         Err(e) => {
                             error!("CTableAgent failed: {}", e);
+                            self.crash().await;
                             break 'main;
                         }
                         Ok(_) => {}
                     }
+                }
+
+                if self.stopped().await {
+                    break 'fallback;
                 }
             }
         };
@@ -148,14 +160,22 @@ where
     }
 
     async fn restart(&self) -> Result<()> {
-        todo!()
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Restarting);
+        Ok(())
     }
 
     async fn crash(&self) {
-        todo!()
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Crashed);
     }
 
     async fn stop(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Stopped);
         todo!()
     }
 
@@ -164,11 +184,15 @@ where
     }
 
     async fn started(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Running
+    }
+
+    async fn stopped(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Stopped
     }
 
     async fn crashed(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -176,11 +200,11 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!("{}@{}", self.app_name, self.shortlabel().await)
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
+        format!("table-agent:{}", self.agent_name)
     }
 
     async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {

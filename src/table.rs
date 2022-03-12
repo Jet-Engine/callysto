@@ -262,11 +262,16 @@ where
     }
 
     async fn restart(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Restarting);
         todo!()
     }
 
     async fn crash(&self) {
-        todo!()
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Crashed);
     }
 
     async fn stop(&self) -> Result<()> {
@@ -278,11 +283,15 @@ where
     }
 
     async fn started(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Running
+    }
+
+    async fn stopped(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Stopped
     }
 
     async fn crashed(&self) -> bool {
-        todo!()
+        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {

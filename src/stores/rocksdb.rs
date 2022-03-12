@@ -307,11 +307,15 @@ where
     }
 
     async fn started(&self) -> bool {
-        todo!()
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Running
+    }
+
+    async fn stopped(&self) -> bool {
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Stopped
     }
 
     async fn crashed(&self) -> bool {
-        todo!()
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -319,11 +323,15 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!(
+            "{}@{}",
+            self.app_name,
+            <Self as Service<State>>::shortlabel(self).await
+        )
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
+        format!("rocksdb:{}", self.table_name)
     }
 
     async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {

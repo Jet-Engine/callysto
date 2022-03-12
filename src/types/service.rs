@@ -21,7 +21,7 @@ use tracing_subscriber::filter::FilterExt;
 
 ///
 /// Possible states that services can be in.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialOrd, PartialEq)]
 pub enum ServiceState {
     PreStart,
     Running,
@@ -49,6 +49,8 @@ where
     async fn wait_until_stopped(&self);
 
     async fn started(&self) -> bool;
+
+    async fn stopped(&self) -> bool;
 
     async fn crashed(&self) -> bool;
 
