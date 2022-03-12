@@ -1,7 +1,8 @@
+use super::context::Context;
+use super::service::{Service, ServiceState};
 use crate::errors::Result as CResult;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
-use super::service::{Service, ServiceState};
 use crate::table::CTable;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
@@ -11,8 +12,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
-use tracing::info;
-use super::context::Context;
+use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 
 pub type Tables<State> = HashMap<String, CTable<State>>;
@@ -22,10 +22,10 @@ pub type Tables<State> = HashMap<String, CTable<State>>;
 ///////////////////////////////////////////////////
 
 pub struct CTableAgent<State, F, Fut>
-    where
-        State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
-        Fut: Future<Output = CResult<()>> + Send + 'static,
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     clo: F,
     app_name: String,
@@ -37,10 +37,10 @@ pub struct CTableAgent<State, F, Fut>
 }
 
 impl<State, F, Fut> CTableAgent<State, F, Fut>
-    where
-        State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
-        Fut: Future<Output = CResult<()>> + Send + 'static,
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     pub fn new(
         clo: F,
@@ -69,8 +69,8 @@ impl<State, F, Fut> CTableAgent<State, F, Fut>
 
 #[async_trait]
 pub trait TableAgent<State>: Service<State> + Send + Sync + 'static
-    where
-        State: Clone + Send + Sync + 'static,
+where
+    State: Clone + Send + Sync + 'static,
 {
     /// Do work on given message, tables with state passed in
     async fn call(
@@ -83,10 +83,10 @@ pub trait TableAgent<State>: Service<State> + Send + Sync + 'static
 
 #[async_trait]
 impl<State, F, Fut> TableAgent<State> for CTableAgent<State, F, Fut>
-    where
-        State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
-        Fut: Future<Output = CResult<()>> + Send + 'static,
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     async fn call(
         &self,
@@ -102,10 +102,10 @@ impl<State, F, Fut> TableAgent<State> for CTableAgent<State, F, Fut>
 
 #[async_trait]
 impl<State, F, Fut> Service<State> for CTableAgent<State, F, Fut>
-    where
-        State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
-        Fut: Future<Output = CResult<()>> + Send + 'static,
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     async fn call(&self, st: Context<State>) -> Result<State> {
         Ok(self.state.clone())
@@ -126,13 +126,20 @@ impl<State, F, Fut> Service<State> for CTableAgent<State, F, Fut>
                 self.topic.topic_name()
             );
             loop {
-                let state = self.state.clone();
-                let tables = self.tables.clone();
-                let message = consumer.recv().await;
-                let context = Context::new(state);
-                let _slow_drop = TableAgent::<State>::call(self, message, tables, context)
-                    .await
-                    .unwrap();
+                'main: loop {
+                    info!("Launched CTableAgent executor.");
+                    let state = self.state.clone();
+                    let tables = self.tables.clone();
+                    let message = consumer.recv().await;
+                    let context = Context::new(state);
+                    match TableAgent::<State>::call(self, message, tables, context).await {
+                        Err(e) => {
+                            error!("CTableAgent failed: {}", e);
+                            break 'main;
+                        }
+                        Ok(_) => {}
+                    }
+                }
             }
         };
 

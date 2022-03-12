@@ -1,12 +1,13 @@
 use crate::config::Config;
-use crate::types::context::Context;
 use crate::errors::*;
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
-use crate::types::table_agent::TableAgent;
-use crate::types::service::{Service, ServiceState};
 use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
+use crate::types::collection::Collection;
+use crate::types::context::Context;
+use crate::types::service::{Service, ServiceState};
+use crate::types::table_agent::TableAgent;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -19,7 +20,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 use url::Url;
-use crate::types::collection::Collection;
 
 #[derive(Clone)]
 pub struct CTable<State = ()>

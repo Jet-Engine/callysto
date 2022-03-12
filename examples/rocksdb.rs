@@ -23,7 +23,7 @@ async fn durable_agent(
             let even_numbers_db_log = read_lines(
                 "/home/vertexclique/projects/calstorage/durable-app-even_numbers-0.db/LOG",
             )
-                .unwrap();
+            .unwrap();
             for l in even_numbers_db_log.take(10) {
                 println!("{}", l.unwrap());
             }
@@ -35,7 +35,7 @@ async fn durable_agent(
             let odd_numbers_db_log = read_lines(
                 "/home/vertexclique/projects/calstorage/durable-app-odd_numbers-0.db/LOG",
             )
-                .unwrap();
+            .unwrap();
             for l in odd_numbers_db_log.take(10) {
                 println!("{}", l.unwrap());
             }

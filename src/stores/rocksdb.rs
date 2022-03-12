@@ -1,10 +1,10 @@
-use crate::types::context::Context;
 use crate::errors::{CallystoError, Result};
 use crate::kafka::ctopic::CTP;
 use crate::prelude::CTable;
-use crate::types::service::{Service, ServiceState};
 use crate::stores::store::Store;
 use crate::types::collection::Collection;
+use crate::types::context::Context;
+use crate::types::service::{Service, ServiceState};
 use async_trait::*;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures_timer::Delay;

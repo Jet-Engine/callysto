@@ -1,8 +1,10 @@
+use super::context::Context;
+use super::service::{Service, ServiceState};
 use crate::errors::Result as CResult;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
-use super::service::{Service, ServiceState};
 use crate::table::CTable;
+use crate::types::task::Task;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
@@ -12,9 +14,7 @@ use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
 use tracing::info;
-use super::context::Context;
 use tracing_subscriber::filter::FilterExt;
-use crate::types::task::Task;
 
 ///////////////////////////////////////////////////
 //////// CronJob
@@ -26,8 +26,8 @@ pub struct CronJob<State> {
 }
 
 impl<State> CronJob<State>
-    where
-        State: Clone + Send + Sync + 'static,
+where
+    State: Clone + Send + Sync + 'static,
 {
     pub fn new<T: AsRef<str>>(cron_expr: T, job: impl Task<State>) -> Self {
         Self {

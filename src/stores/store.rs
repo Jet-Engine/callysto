@@ -1,11 +1,11 @@
 use crate::errors::*;
 use crate::kafka::ctopic::CTP;
 use crate::table::CTable;
+use crate::types::service::Service;
 use async_trait::*;
 use rdkafka::message::OwnedMessage;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use crate::types::service::Service;
 
 #[async_trait]
 pub trait Store<State>: Service<State>

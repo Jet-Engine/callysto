@@ -1,7 +1,12 @@
+use super::context::Context;
 use crate::errors::Result as CResult;
 use crate::errors::*;
+use crate::errors::*;
+use crate::errors::*;
+use crate::kafka::ctopic::*;
 use crate::kafka::ctopic::*;
 use crate::table::CTable;
+use async_trait::*;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
@@ -11,12 +16,7 @@ use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
 use tracing::info;
-use super::context::Context;
 use tracing_subscriber::filter::FilterExt;
-use crate::errors::*;
-use crate::errors::*;
-use crate::kafka::ctopic::*;
-use async_trait::*;
 
 ///
 /// Possible states that services can be in.
@@ -31,8 +31,8 @@ pub enum ServiceState {
 
 #[async_trait]
 pub trait Service<State>: Send + Sync + 'static
-    where
-        State: Clone + Send + Sync + 'static,
+where
+    State: Clone + Send + Sync + 'static,
 {
     /// Execute the given task with state passed in
     async fn call(&self, st: Context<State>) -> Result<State>;
@@ -66,8 +66,8 @@ pub trait Service<State>: Send + Sync + 'static
 ///////////////////////////////////////////////////
 
 pub struct CService<State>
-    where
-        State: Clone + Send + Sync + 'static,
+where
+    State: Clone + Send + Sync + 'static,
 {
     dependencies: Vec<Arc<dyn Service<State>>>,
 }

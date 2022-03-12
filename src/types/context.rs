@@ -1,7 +1,7 @@
+use super::service::{Service, ServiceState};
 use crate::errors::Result as CResult;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
-use super::service::{Service, ServiceState};
 use crate::table::CTable;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};

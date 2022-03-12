@@ -20,12 +20,12 @@ use tracing::{error, info};
 use tracing_subscriber::{self, fmt, EnvFilter};
 use url::Url;
 
-use crate::types::context::*;
+use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::BastionRuntime};
-use crate::config::Config;
 use crate::table::CTable;
 use crate::types::agent::{Agent, CAgent};
+use crate::types::context::*;
 use crate::types::cronjob::CronJob;
 use crate::types::service::Service;
 use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
@@ -339,6 +339,7 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Agent with ID: {}", aid);
+                // TODO: Recovery should be here.
                 bastion::executor::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,
@@ -353,6 +354,7 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Table Agent with ID: {}", aid);
+                // TODO: Recovery should be here.
                 bastion::executor::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,

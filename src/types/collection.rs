@@ -1,12 +1,12 @@
-use async_trait::async_trait;
-use crate::stores::store::Store;
-use crate::kafka::ctopic::*;
 use crate::errors::*;
+use crate::kafka::ctopic::*;
+use crate::stores::store::Store;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait Collection<State>: Store<State>
-    where
-        State: Clone + Send + Sync + 'static,
+where
+    State: Clone + Send + Sync + 'static,
 {
     /// Get changelog topic
     fn changelog_topic(&self) -> CTopic;
