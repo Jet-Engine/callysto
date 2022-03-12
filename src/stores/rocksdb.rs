@@ -295,7 +295,9 @@ where
     }
 
     async fn crash(&self) {
-        todo!()
+        <Self as Service<State>>::service_state(self)
+            .await
+            .replace_with(|e| ServiceState::Crashed);
     }
 
     async fn stop(&self) -> Result<()> {
