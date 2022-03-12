@@ -10,6 +10,7 @@ use async_trait::*;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
 use std::collections::HashMap;
 use std::future::Future;
@@ -58,7 +59,7 @@ where
     async fn shortlabel(&self) -> String;
 
     // Provider methods
-    async fn service_state(&self) -> Arc<ServiceState>;
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>>;
 }
 
 ///////////////////////////////////////////////////

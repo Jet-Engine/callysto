@@ -7,6 +7,7 @@ use crate::types::service::{Service, ServiceState};
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
 use std::collections::HashMap;
 use std::future::Future;
@@ -121,6 +122,9 @@ where
                     match Agent::<State>::call(self, message, context).await {
                         Err(e) => {
                             error!("CAgent failed: {}", e);
+                            self.service_state()
+                                .await
+                                .replace_with(|e| ServiceState::Crashed);
                             break 'main;
                         }
                         _ => {}
@@ -168,7 +172,7 @@ where
         todo!()
     }
 
-    async fn service_state(&self) -> Arc<ServiceState> {
-        todo!()
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

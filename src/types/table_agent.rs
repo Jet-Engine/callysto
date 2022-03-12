@@ -7,6 +7,7 @@ use crate::table::CTable;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
 use std::collections::HashMap;
 use std::future::Future;
@@ -182,7 +183,7 @@ where
         todo!()
     }
 
-    async fn service_state(&self) -> Arc<ServiceState> {
-        todo!()
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

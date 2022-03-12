@@ -11,6 +11,7 @@ use crate::types::table_agent::TableAgent;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
@@ -300,7 +301,7 @@ where
         format!("Table: {}", self.table_name)
     }
 
-    async fn service_state(&self) -> Arc<ServiceState> {
-        todo!()
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

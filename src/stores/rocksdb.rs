@@ -326,8 +326,8 @@ where
         todo!()
     }
 
-    async fn service_state(&self) -> Arc<ServiceState> {
-        self.service_state.get()
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        self.service_state.clone()
     }
 }
 
