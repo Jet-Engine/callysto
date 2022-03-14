@@ -1,3 +1,4 @@
+use std::str::Utf8Error;
 use std::{io, result};
 use thiserror::Error;
 
@@ -16,6 +17,15 @@ pub enum CallystoError {
 
     #[error("Binary Serialization error: {0}")]
     BinSerializationError(#[from] bincode::Error),
+
+    #[error("Serde JSON error: {0}")]
+    SerdeJsonError(#[from] serde_json::Error),
+
+    #[error("Kafka error: {0}")]
+    KafkaError(#[from] rdkafka::error::KafkaError),
+
+    #[error("UTF-8 Conversion error: {0}")]
+    UTF8ConversionError(#[from] Utf8Error),
 
     #[error("RocksDB Error")]
     RocksDBError(#[from] rocksdb::Error),

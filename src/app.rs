@@ -20,12 +20,16 @@ use tracing::{error, info};
 use tracing_subscriber::{self, fmt, EnvFilter};
 use url::Url;
 
-use crate::definitions::*;
+use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::BastionRuntime};
-use crate::prelude::{Config, CronJob};
-use crate::service::Service;
-use crate::table::{CTable, Collection};
+use crate::table::CTable;
+use crate::types::agent::{Agent, CAgent};
+use crate::types::context::*;
+use crate::types::cronjob::CronJob;
+use crate::types::service::Service;
+use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
+use crate::types::task::Task;
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
@@ -138,13 +142,19 @@ where
         &self,
         name: T,
         topic: CTopic,
-        tables: HashMap<String, CTable<State>>,
+        mut tables: HashMap<String, CTable<State>>,
         clo: F,
     ) -> &Self
     where
         F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
+        // println!("BOMBARDIER");
+        // println!("ASSIGN SOURCE BEFORE CALL: {:?}", tables.len());
+        // for (_, mut table) in tables.iter_mut() {
+        //     println!("ASSIGN SOURCE TOPIC CALLED");
+        //     table.assign_source_topic(topic.clone());
+        // }
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let table_agent = CTableAgent::new(
             clo,
@@ -219,6 +229,10 @@ where
                 format!("{}", self.config.request_timeout_ms),
             )
             .set("check.crcs", format!("{}", self.config.check_crcs))
+            .set(
+                "statistics.interval.ms",
+                format!("{}", self.config.statistics_interval_ms),
+            )
             .set(
                 "session.timeout.ms",
                 format!("{}", self.config.session_timeout_ms),
@@ -335,6 +349,7 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Agent with ID: {}", aid);
+                // TODO: Recovery should be here.
                 bastion::executor::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,
@@ -349,6 +364,7 @@ where
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Table Agent with ID: {}", aid);
+                // TODO: Recovery should be here.
                 bastion::executor::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,

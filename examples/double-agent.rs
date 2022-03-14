@@ -19,10 +19,12 @@ impl SharedState {
 
 async fn counter_agent_1(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
     // Read the incoming bytes as string
-    msg.map(|m| {
-        let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
-        // println!("Received payload from Agent 1: `{}`", strm);
-    });
+    let m = msg.unwrap();
+    let strm = m
+        .payload_view::<str>()
+        .ok_or(CallystoError::GeneralError("Payload view failure".into()))??;
+    // let s = strm?;
+    println!("Received payload from Agent 1: `{}`", strm);
 
     // Increment message counter and print it.
     // Show how you can store a application state.

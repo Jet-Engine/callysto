@@ -1,7 +1,7 @@
 use crate::errors::*;
 use crate::kafka::ctopic::CTP;
-use crate::service::*;
 use crate::table::CTable;
+use crate::types::service::Service;
 use async_trait::*;
 use rdkafka::message::OwnedMessage;
 use serde::de::DeserializeOwned;

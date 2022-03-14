@@ -1,10 +1,10 @@
-use crate::definitions::Context;
 use crate::errors::{CallystoError, Result};
 use crate::kafka::ctopic::CTP;
 use crate::prelude::CTable;
-use crate::service::{Service, ServiceState};
 use crate::stores::store::Store;
-use crate::table::Collection;
+use crate::types::collection::Collection;
+use crate::types::context::Context;
+use crate::types::service::{Service, ServiceState};
 use async_trait::*;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures_timer::Delay;
@@ -281,6 +281,7 @@ where
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let closure = async move {
             info!("Rocksdb backend is started.");
+            self.service_state.replace_with(|_| ServiceState::Running);
         };
 
         Ok(closure.boxed())
@@ -295,7 +296,9 @@ where
     }
 
     async fn crash(&self) {
-        todo!()
+        <Self as Service<State>>::service_state(self)
+            .await
+            .replace_with(|e| ServiceState::Crashed);
     }
 
     async fn stop(&self) -> Result<()> {
@@ -307,11 +310,15 @@ where
     }
 
     async fn started(&self) -> bool {
-        todo!()
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Running
+    }
+
+    async fn stopped(&self) -> bool {
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Stopped
     }
 
     async fn crashed(&self) -> bool {
-        todo!()
+        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -319,15 +326,19 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!(
+            "{}@{}",
+            self.app_name,
+            <Self as Service<State>>::shortlabel(self).await
+        )
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
+        format!("rocksdb:{}", self.table_name)
     }
 
-    async fn service_state(&self) -> Arc<ServiceState> {
-        self.service_state.get()
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        self.service_state.clone()
     }
 }
 
@@ -352,6 +363,7 @@ where
         msg: OwnedMessage,
     ) -> Result<()> {
         let partition: usize = msg.partition() as _;
+        // self.send_changelog(self.partition_for_key(serialized_key))
         let db = self.db_for_partition(partition)?;
         Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
     }
@@ -363,7 +375,7 @@ where
     }
 
     fn table(&self) -> CTable<State> {
-        todo!()
+        unimplemented!("Table needs to be implemented on top of Storage.")
     }
 
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {

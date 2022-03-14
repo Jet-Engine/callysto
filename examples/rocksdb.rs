@@ -20,25 +20,25 @@ async fn durable_agent(
             even_numbers.set(num, num, m).unwrap();
 
             // Database is created, and started to be filled in.
-            let even_numbers_db_log = read_lines(
-                "/home/vertexclique/projects/calstorage/durable-app-even_numbers-0.db/LOG",
-            )
-                .unwrap();
-            for l in even_numbers_db_log.take(10) {
-                println!("{}", l.unwrap());
-            }
+            // let even_numbers_db_log = read_lines(
+            //     "/home/vcq/projects/calstorage/durable-app-even_numbers-0.db/LOG",
+            // )
+            // .unwrap();
+            // for l in even_numbers_db_log.take(10) {
+            //     println!("{}", l.unwrap());
+            // }
         } else {
             let even_numbers = tables.get("odd_numbers").unwrap();
             even_numbers.set(num, num, m).unwrap();
 
             // Database is created, and started to be filled in.
-            let odd_numbers_db_log = read_lines(
-                "/home/vertexclique/projects/calstorage/durable-app-odd_numbers-0.db/LOG",
-            )
-                .unwrap();
-            for l in odd_numbers_db_log.take(10) {
-                println!("{}", l.unwrap());
-            }
+            // let odd_numbers_db_log = read_lines(
+            //     "/home/vcq/projects/calstorage/durable-app-odd_numbers-0.db/LOG",
+            // )
+            // .unwrap();
+            // for l in odd_numbers_db_log.take(10) {
+            //     println!("{}", l.unwrap());
+            // }
         }
     });
 
@@ -57,7 +57,7 @@ fn main() {
     let mut app = Callysto::default();
     // Configure application.
     app.with_name("durable-app")
-        .with_storage("rocksdb:///home/vertexclique/projects/calstorage");
+        .with_storage("rocksdb:///home/vcq/projects/calstorage");
 
     // Create all the tables that we need.
     let mut tables = Tables::new();
