@@ -1,3 +1,4 @@
+pub mod cadmin;
 pub mod cconsumer;
 pub mod contexts;
 pub mod cproducer;

@@ -4,10 +4,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::kafka::cadmin::CAdminClient;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_timer::Delay;
 use lever::sync::atomics::AtomicBox;
+use rdkafka::admin::AdminClient;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
@@ -53,6 +55,13 @@ impl CTopic {
             consumer,
             consumer_context,
         }
+    }
+
+    pub fn admin_client(&self) -> CAdminClient {
+        CAdminClient::new(
+            self.client_config.clone(),
+            CConsumerContext::new(self.topic.clone()),
+        )
     }
 
     pub fn producer(&self) -> CProducer {
