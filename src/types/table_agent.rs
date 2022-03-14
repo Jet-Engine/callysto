@@ -113,7 +113,6 @@ where
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
-        info!("CTableAgent");
         let closure = async move {
             for (table_name, table) in &self.tables {
                 table.start().await.unwrap().await;
@@ -121,6 +120,14 @@ where
             }
 
             let consumer = self.topic.consumer();
+
+            // Assign consumer contexts to get the statistics data
+            self.tables.iter().for_each(|(name, table)| {
+                table
+                    .source_topic_consumer_context
+                    .replace_with(|_| Some(consumer.consumer_context.clone()));
+            });
+
             info!(
                 "Started Table Agent - Consumer Group `{}` - Topic `{}`",
                 self.app_name,

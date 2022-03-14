@@ -16,6 +16,7 @@ use rdkafka::ClientConfig;
 use tracing::error;
 
 use crate::kafka::cconsumer::CConsumer;
+use crate::kafka::contexts::CConsumerContext;
 use crate::kafka::cproducer::CProducer;
 use crate::kafka::runtime::BastionRuntime;
 
@@ -41,13 +42,17 @@ impl CTopic {
     }
 
     pub fn consumer(&self) -> CConsumer {
+        let consumer_context = CConsumerContext::new(self.topic.clone());
         let consumer: StreamConsumer<_, BastionRuntime> = self
             .client_config
-            .create()
+            .create_with_context(consumer_context.clone())
             .expect("Consumer creation failed");
         consumer.subscribe(&[&self.topic]).unwrap();
 
-        CConsumer { consumer }
+        CConsumer {
+            consumer,
+            consumer_context,
+        }
     }
 
     pub fn producer(&self) -> CProducer {

@@ -18,6 +18,9 @@ pub enum CallystoError {
     #[error("Binary Serialization error: {0}")]
     BinSerializationError(#[from] bincode::Error),
 
+    #[error("Serde JSON error: {0}")]
+    SerdeJsonError(#[from] serde_json::Error),
+
     #[error("UTF-8 Conversion error: {0}")]
     UTF8ConversionError(#[from] Utf8Error),
 

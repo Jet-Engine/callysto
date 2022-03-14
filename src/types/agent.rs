@@ -148,7 +148,8 @@ where
         self.service_state()
             .await
             .replace_with(|e| ServiceState::Restarting);
-        todo!()
+
+        Ok(())
     }
 
     async fn crash(&self) {
@@ -158,7 +159,11 @@ where
     }
 
     async fn stop(&self) -> Result<()> {
-        todo!()
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Stopped);
+
+        Ok(())
     }
 
     async fn wait_until_stopped(&self) {

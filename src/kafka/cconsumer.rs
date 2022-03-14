@@ -4,6 +4,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::kafka::contexts::CConsumerContext;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_timer::Delay;
@@ -17,11 +18,12 @@ use tracing::error;
 use crate::kafka::runtime::BastionRuntime;
 
 pub struct CConsumer {
-    pub(super) consumer: StreamConsumer<DefaultConsumerContext, BastionRuntime>,
+    pub(super) consumer: StreamConsumer<CConsumerContext, BastionRuntime>,
+    pub consumer_context: CConsumerContext,
 }
 
 impl CConsumer {
-    pub fn stream(&self) -> MessageStream<'_, DefaultConsumerContext, BastionRuntime> {
+    pub fn stream(&self) -> MessageStream<'_, CConsumerContext, BastionRuntime> {
         self.consumer.stream()
     }
 

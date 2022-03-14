@@ -142,13 +142,19 @@ where
         &self,
         name: T,
         topic: CTopic,
-        tables: HashMap<String, CTable<State>>,
+        mut tables: HashMap<String, CTable<State>>,
         clo: F,
     ) -> &Self
     where
         F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
+        // println!("BOMBARDIER");
+        // println!("ASSIGN SOURCE BEFORE CALL: {:?}", tables.len());
+        // for (_, mut table) in tables.iter_mut() {
+        //     println!("ASSIGN SOURCE TOPIC CALLED");
+        //     table.assign_source_topic(topic.clone());
+        // }
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let table_agent = CTableAgent::new(
             clo,
@@ -223,6 +229,10 @@ where
                 format!("{}", self.config.request_timeout_ms),
             )
             .set("check.crcs", format!("{}", self.config.check_crcs))
+            .set(
+                "statistics.interval.ms",
+                format!("{}", self.config.statistics_interval_ms),
+            )
             .set(
                 "session.timeout.ms",
                 format!("{}", self.config.session_timeout_ms),

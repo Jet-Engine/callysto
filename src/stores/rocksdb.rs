@@ -281,6 +281,7 @@ where
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let closure = async move {
             info!("Rocksdb backend is started.");
+            self.service_state.replace_with(|_| ServiceState::Running);
         };
 
         Ok(closure.boxed())
@@ -362,6 +363,7 @@ where
         msg: OwnedMessage,
     ) -> Result<()> {
         let partition: usize = msg.partition() as _;
+        // self.send_changelog(self.partition_for_key(serialized_key))
         let db = self.db_for_partition(partition)?;
         Ok(db.put(serialized_key.as_slice(), serialized_val.as_slice())?)
     }
@@ -373,7 +375,7 @@ where
     }
 
     fn table(&self) -> CTable<State> {
-        todo!()
+        unimplemented!("Table needs to be implemented on top of Storage.")
     }
 
     fn persisted_offset(&self, tp: CTP) -> Result<Option<usize>> {

@@ -1,5 +1,8 @@
 use crate::config::Config;
+use crate::errors::CallystoError::GeneralError;
 use crate::errors::*;
+use crate::kafka::cconsumer::CConsumer;
+use crate::kafka::contexts::{CConsumerContext, CStatistics};
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
 use crate::stores::rocksdb::RocksDbStore;
@@ -14,12 +17,13 @@ use futures::FutureExt;
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
-use rdkafka::ClientConfig;
+use rdkafka::{ClientConfig, ClientContext, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
+use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
 #[derive(Clone)]
@@ -27,10 +31,13 @@ pub struct CTable<State = ()>
 where
     State: Clone + Send + Sync + 'static,
 {
-    table_name: String,
+    pub app_name: String,
+    pub table_name: String,
     storage_url: Url,
     config: Config,
-    changelog_topic: CTopic,
+    pub source_topic_consumer_context: Arc<AtomicBox<Option<CConsumerContext>>>,
+    pub changelog_topic: CTopic,
+    pub changelog_consumer: Arc<AtomicBox<CConsumer>>,
     data: Arc<dyn Store<State>>,
 }
 
@@ -50,11 +57,15 @@ where
             format!("{}-{}-changelog", app_name, table_name),
             client_config,
         );
+        let changelog_consumer = changelog_topic.consumer();
         Ok(Self {
+            app_name,
             table_name,
             storage_url,
             config,
+            source_topic_consumer_context: Arc::new(AtomicBox::new(None)),
             changelog_topic,
+            changelog_consumer: Arc::new(AtomicBox::new(changelog_consumer)),
             data,
         })
     }
@@ -67,7 +78,7 @@ where
         V: DeserializeOwned,
     {
         let serialized_key = bincode::serialize(&key)?;
-        match self.data.get(serialized_key, msg)? {
+        match <Self as Store<State>>::get(self, serialized_key, msg)? {
             Some(value_slice) => Ok(Some(bincode::deserialize::<V>(value_slice.as_slice())?)),
             _ => Ok(None),
         }
@@ -82,7 +93,12 @@ where
     {
         let serialized_key = bincode::serialize(&key)?;
         let serialized_val = bincode::serialize(&value)?;
-        self.data.set(serialized_key, serialized_val, msg)
+        Ok(<Self as Store<State>>::set(
+            self,
+            serialized_key,
+            serialized_val,
+            msg,
+        )?)
     }
 
     ///
@@ -92,7 +108,11 @@ where
         K: Serialize,
     {
         let serialized_key = bincode::serialize(&key)?;
-        self.data.del(serialized_key, msg)
+        Ok(<Self as Store<State>>::del(self, serialized_key, msg)?)
+    }
+
+    pub fn storage(&self) -> Arc<dyn Store<State>> {
+        self.data.clone()
     }
 
     fn new_storage(
@@ -126,6 +146,64 @@ where
         todo!()
     }
 
+    fn verify_source_topic_partitions(&self) -> Result<()> {
+        let source_topic_ccontext = self
+            .source_topic_consumer_context
+            .get()
+            .as_ref()
+            .to_owned()
+            .unwrap();
+        let source_topic_name = source_topic_ccontext.topic_name.clone();
+        let source_topic_stats = source_topic_ccontext.get_stats();
+        match &*source_topic_stats {
+            Some(stat) => {
+                let source_topic_meta = stat.topics.get(source_topic_name.as_str()).ok_or(
+                    CallystoError::GeneralError("Source topic is not found in metadata.".into()),
+                )?;
+                // dbg!(&source_topic_meta);
+                let changelog_topic_meta = stat
+                    .topics
+                    .get(self.changelog_topic.topic_name().as_str())
+                    .ok_or(CallystoError::GeneralError(
+                        "Changelog topic is not found in metadata.".into(),
+                    ))?;
+                let source_n = source_topic_meta.partitions.len() - 1;
+                let changelog_n = changelog_topic_meta.partitions.len() - 1;
+
+                if source_n != changelog_n {
+                    info!(
+                        "Source <> Changelog partitions are not matching. Source: {}, Changelog: {}",
+                        source_n, changelog_n
+                    );
+                    return Err(CallystoError::GeneralError(
+                        "Partition mismatch in changelog vs source topics".into(),
+                    ));
+                }
+            }
+            _ => return Err(GeneralError("No stat has been received".into())),
+        }
+
+        // let changelog_topic_stats = self.changelog_consumer.get().consumer_context.get_stats();
+        // let changelog_n = match &*changelog_topic_stats {
+        //     Some(stat) => {
+        //         let x = stat
+        //             .topics
+        //             .get(self.changelog_topic.topic_name().as_str())
+        //             .unwrap();
+        //         x.partitions.len()
+        //     }
+        //     _ => {
+        //         return Err(GeneralError(
+        //             "No stat has been received for changelog topic".into(),
+        //         ))
+        //     }
+        // };
+
+        info!("Source <> Changelog partitions are matching");
+
+        Ok(())
+    }
+
     pub fn info(&self) -> HashMap<String, String> {
         todo!()
     }
@@ -148,16 +226,23 @@ where
         self.changelog_topic.topic_name()
     }
 
-    async fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+    async fn send_changelog(
+        &self,
+        partition: usize,
+        serialized_key: Vec<u8>,
+        serialized_value: Vec<u8>,
+    ) -> Result<()> {
         let topic = self.changelog_topic.clone();
 
         let handle = bastion::executor::blocking(async move {
             let producer = topic.producer();
             let topic_name = topic.topic_name();
-            let key = key.clone();
-            let value = value.clone();
+            let serialized_key = serialized_key.clone();
+            let serialized_value = serialized_value.clone();
 
-            producer.send(topic_name, partition, key, value).await
+            producer
+                .send(topic_name, partition, serialized_key, serialized_value)
+                .await
         });
 
         handle.await;
@@ -165,8 +250,9 @@ where
         Ok(())
     }
 
-    fn partition_for_key(&self, key: Vec<u8>) -> Result<usize> {
-        todo!()
+    fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>> {
+        self.verify_source_topic_partitions()?;
+        Ok(Some(msg.partition() as usize))
     }
 }
 
@@ -185,11 +271,41 @@ where
         serialized_val: Vec<u8>,
         msg: OwnedMessage,
     ) -> Result<()> {
-        self.data.set(serialized_key, serialized_val, msg)
+        self.data
+            .set(serialized_key.clone(), serialized_val.clone(), msg.clone())?;
+        let partition_for_key = self
+            .partition_for_key(serialized_key.clone(), msg)?
+            .unwrap();
+
+        let dispatch = self.clone();
+        let clo = async move {
+            dispatch
+                .send_changelog(partition_for_key, serialized_key, serialized_val)
+                .await;
+        };
+
+        bastion::executor::spawn(clo);
+
+        Ok(())
     }
 
     fn del(&self, serialized_key: Vec<u8>, msg: OwnedMessage) -> Result<()> {
-        self.data.del(serialized_key, msg)
+        self.data.del(serialized_key.clone(), msg.clone())?;
+
+        let partition_for_key = self
+            .partition_for_key(serialized_key.clone(), msg)?
+            .unwrap();
+
+        let dispatch = self.clone();
+        let clo = async move {
+            dispatch
+                .send_changelog(partition_for_key, serialized_key, vec![])
+                .await;
+        };
+
+        bastion::executor::spawn(clo);
+
+        Ok(())
     }
 
     fn table(&self) -> CTable<State> {
@@ -265,7 +381,8 @@ where
         self.service_state()
             .await
             .replace_with(|e| ServiceState::Restarting);
-        todo!()
+
+        Ok(())
     }
 
     async fn crash(&self) {
@@ -307,7 +424,7 @@ where
     }
 
     async fn shortlabel(&self) -> String {
-        format!("Table: {}", self.table_name)
+        format!("table:{}", self.table_name)
     }
 
     async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {

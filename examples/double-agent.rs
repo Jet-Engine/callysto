@@ -18,8 +18,6 @@ impl SharedState {
 }
 
 async fn counter_agent_1(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
-    // panic!("Damam sana guveniyom.");
-    return Err(CallystoError::GeneralError("Damam sana guveniyom.".into()));
     // Read the incoming bytes as string
     let m = msg.unwrap();
     let strm = m

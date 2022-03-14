@@ -85,6 +85,10 @@ pub struct Config {
     pub check_crcs: bool,
 
     ///
+    /// Statistics emit interval
+    pub statistics_interval_ms: usize,
+
+    ///
     /// Protocol used to communicate with brokers.
     pub security_protocol: SecurityProtocol,
 
@@ -140,6 +144,7 @@ impl Default for Config {
             max_partition_fetch_bytes: 1024 * 1024,
             fetch_max_wait_ms: 1500,
             check_crcs: true,
+            statistics_interval_ms: 200,
             security_protocol: SecurityProtocol::Plaintext,
             ssl_ca_location: None,
             ssl_certificate_location: None,

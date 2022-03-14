@@ -2,6 +2,7 @@ use crate::errors::*;
 use crate::kafka::ctopic::*;
 use crate::stores::store::Store;
 use async_trait::async_trait;
+use rdkafka::message::OwnedMessage;
 
 #[async_trait]
 pub trait Collection<State>: Store<State>
@@ -15,7 +16,12 @@ where
 
     fn changelog_topic_name(&self) -> String;
 
-    async fn send_changelog(&self, partition: usize, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
+    async fn send_changelog(
+        &self,
+        partition: usize,
+        serialized_key: Vec<u8>,
+        serialized_value: Vec<u8>,
+    ) -> Result<()>;
 
-    fn partition_for_key(&self, key: Vec<u8>) -> Result<usize>;
+    fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>>;
 }

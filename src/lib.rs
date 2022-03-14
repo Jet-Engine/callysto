@@ -2,11 +2,15 @@
 #![allow(dead_code)]
 #![allow(unused_must_use)]
 #![allow(unused)]
+// XXX: Reverse trait coercion is needed for layered composition.
+#![feature(trait_upcasting)]
+#![allow(incomplete_features)]
 
 pub mod app;
 pub mod config;
 pub mod errors;
 pub mod kafka;
+pub mod sensors;
 pub mod table;
 pub mod types;
 
