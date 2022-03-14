@@ -4,12 +4,13 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::errors::*;
 use crate::kafka::cadmin::CAdminClient;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_timer::Delay;
 use lever::sync::atomics::AtomicBox;
-use rdkafka::admin::AdminClient;
+use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication, TopicResult};
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
@@ -72,14 +73,34 @@ impl CTopic {
         self.client_config.clone()
     }
 
-    pub fn topic_declare(
+    pub async fn topic_declare(
         &self,
         compacting: bool,
         deleting: bool,
         retention: f64,
         partitions: usize,
-    ) {
-        todo!()
+    ) -> Result<Vec<TopicResult>> {
+        let manager = self.admin_client().manager();
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(1)));
+        let topic_name = self.topic.clone();
+
+        let mut topic = NewTopic::new(
+            topic_name.as_str(),
+            partitions as _,
+            TopicReplication::Fixed(1),
+        );
+
+        let mut topic = match (compacting, deleting) {
+            (true, true) => topic.set("cleanup.policy", "compact,delete"),
+            (false, true) => topic.set("cleanup.policy", "delete"),
+            (true, false) => topic.set("cleanup.policy", "compact"),
+            _ => topic,
+        };
+
+        let retention = format!("{}", retention as usize);
+        topic = topic.set("retention.ms", retention.as_str());
+
+        Ok(manager.create_topics(&[topic], &opts).await?)
     }
 }
 
