@@ -3,6 +3,7 @@ use callysto::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::info;
 
 #[derive(Clone)]
 struct SharedState {
@@ -23,8 +24,10 @@ async fn counter_agent_1(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
     let strm = m
         .payload_view::<str>()
         .ok_or(CallystoError::GeneralError("Payload view failure".into()))??;
+
+    info!("Received payload on counter_agent_1");
     // let s = strm?;
-    println!("Received payload from Agent 1: `{}`", strm);
+    // println!("Received payload from Agent 1: `{}`", strm);
 
     // Increment message counter and print it.
     // Show how you can store a application state.
@@ -51,6 +54,7 @@ async fn counter_agent_2(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
         // println!("Received payload from Agent 2: `{}`", strm);
     });
+    info!("Received payload on counter_agent_2");
 
     // Increment message counter and print it.
     // Show how you can store a application state.
