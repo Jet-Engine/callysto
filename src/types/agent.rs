@@ -123,6 +123,10 @@ where
                         break 'main;
                     }
                     let message = consumer.recv().await;
+                    if message.is_none() {
+                        // Error while receiving from Kafka.
+                        break 'fallback;
+                    }
                     let state = state.clone();
                     let context = Context::new(state);
                     match Agent::<State>::call(self, message, context).await {
@@ -144,42 +148,8 @@ where
         Ok(closure.boxed())
     }
 
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
-
-        Ok(())
-    }
-
-    async fn crash(&self) {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn stop(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Stopped);
-
-        Ok(())
-    }
-
     async fn wait_until_stopped(&self) {
         todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {

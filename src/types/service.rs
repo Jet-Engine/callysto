@@ -44,19 +44,41 @@ where
         Ok(())
     }
 
-    async fn restart(&self) -> Result<()>;
+    async fn restart(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Restarting);
 
-    async fn crash(&self);
+        Ok(())
+    }
 
-    async fn stop(&self) -> Result<()>;
+    async fn crash(&self) {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Crashed);
+    }
+
+    async fn stop(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Stopped);
+
+        Ok(())
+    }
 
     async fn wait_until_stopped(&self);
 
-    async fn started(&self) -> bool;
+    async fn started(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Running
+    }
 
-    async fn stopped(&self) -> bool;
+    async fn stopped(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Stopped
+    }
 
-    async fn crashed(&self) -> bool;
+    async fn crashed(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Crashed
+    }
 
     async fn state(&self) -> String;
 

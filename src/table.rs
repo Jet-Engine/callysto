@@ -13,7 +13,7 @@ use crate::types::service::{Service, ServiceState};
 use crate::types::table_agent::TableAgent;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{FutureExt, SinkExt};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
@@ -22,7 +22,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::mpsc::channel;
 use std::time::Duration;
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use futures_timer::Delay;
 use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
@@ -40,6 +42,8 @@ where
     pub source_topic_consumer_context: Arc<AtomicBox<Option<CConsumerContext>>>,
     pub changelog_topic: CTopic,
     pub changelog_consumer: Arc<AtomicBox<CConsumer>>,
+    pub changelog_tx: Sender<(usize, Vec<u8>, Vec<u8>)>,
+    pub changelog_rx: Receiver<(usize, Vec<u8>, Vec<u8>)>,
     data: Arc<dyn Store<State>>,
 }
 
@@ -61,6 +65,7 @@ where
         );
 
         let changelog_consumer = changelog_topic.consumer();
+        let (changelog_tx, changelog_rx) = unbounded::<(usize, Vec<u8>, Vec<u8>)>();
 
         Ok(Self {
             app_name,
@@ -69,6 +74,8 @@ where
             config,
             source_topic_consumer_context: Arc::new(AtomicBox::new(None)),
             changelog_topic,
+            changelog_tx,
+            changelog_rx,
             changelog_consumer: Arc::new(AtomicBox::new(changelog_consumer)),
             data,
         })
@@ -235,6 +242,31 @@ where
         Ok(())
     }
 
+    fn start_changelog_worker(&self) -> Result<()> {
+        let rx = self.changelog_rx.clone();
+        let topic = self.changelog_topic.clone();
+
+        nuclei::spawn(async move {
+            let producer = topic.producer();
+            loop {
+                match rx.recv() {
+                    Ok((partition, serialized_key, serialized_value)) => {
+                        let topic_name = topic.topic_name();
+                        let serialized_key = serialized_key.clone();
+                        let serialized_value = serialized_value.clone();
+
+                        producer
+                            .send(topic_name, partition, serialized_key, serialized_value)
+                            .await;
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        Ok(())
+    }
+
     pub fn info(&self) -> HashMap<String, String> {
         todo!()
     }
@@ -263,34 +295,28 @@ where
         serialized_key: Vec<u8>,
         serialized_value: Vec<u8>,
     ) -> Result<()> {
-        let topic = self.changelog_topic.clone();
+        self.changelog_tx.send((partition, serialized_key, serialized_value));
 
-        let handle = nuclei::spawn(async move {
-            let producer = topic.producer();
-            let topic_name = topic.topic_name();
-            let serialized_key = serialized_key.clone();
-            let serialized_value = serialized_value.clone();
-
-            producer
-                .send(topic_name, partition, serialized_key, serialized_value)
-                .await
-        });
-
-        handle.await;
+        // let topic = self.changelog_topic.clone();
+        //
+        // let handle = nuclei::spawn(async move {
+        //     let producer = topic.producer();
+        //     let topic_name = topic.topic_name();
+        //     let serialized_key = serialized_key.clone();
+        //     let serialized_value = serialized_value.clone();
+        //
+        //     producer
+        //         .send(topic_name, partition, serialized_key, serialized_value)
+        //         .await;
+        // });
+        //
+        // handle.await;
 
         Ok(())
     }
 
     fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>> {
-        self.verify_source_topic_partitions().or_else(|e| {
-            match e {
-                CallystoError::NoTopic(topic_name, _) if topic_name.contains("changelog") => {
-                    info!("Changelog topic hasn't been created yet.");
-                    Ok(())
-                }
-                _ => Err(e)
-            }
-        })?;
+        self.verify_source_topic_partitions()?;
         Ok(Some(msg.partition() as usize))
     }
 }
@@ -313,7 +339,14 @@ where
         self.data
             .set(serialized_key.clone(), serialized_val.clone(), msg.clone())?;
         let partition_for_key = self
-            .partition_for_key(serialized_key.clone(), msg)?
+            .partition_for_key(serialized_key.clone(), msg.clone())
+            .or_else::<CallystoError, _>(|e| {
+                // Since it's failed to verify partition, we still queue for a later time when changelog topic is available.
+                // Or any other error occurs.
+                error!("{:?}", e);
+                Ok(Some(msg.partition() as _))
+            })
+            .unwrap()
             .unwrap();
 
         let dispatch = self.clone();
@@ -411,6 +444,8 @@ where
                 self.changelog_topic_name()
             );
             self.data.start().await;
+            // Start changelog worker
+            self.start_changelog_worker();
         };
 
         Ok(closure.boxed())
@@ -421,38 +456,8 @@ where
         Ok(())
     }
 
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
-
-        Ok(())
-    }
-
-    async fn crash(&self) {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn stop(&self) -> Result<()> {
-        todo!()
-    }
-
     async fn wait_until_stopped(&self) {
         todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {

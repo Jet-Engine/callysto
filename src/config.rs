@@ -137,7 +137,7 @@ impl Default for Config {
             auto_offset_reset: OffsetReset::Latest,
             auto_commit_interval_ms: 5_000,
             enable_auto_offset_store: false,
-            max_poll_interval_ms: 1_000_000, // 16.67 mins
+            max_poll_interval_ms: 70_000, // 16.67 mins
             request_timeout_ms: 90_000,
             heartbeat_interval_ms: 3_000,
             isolation_level: IsolationLevel::ReadUncommitted,
