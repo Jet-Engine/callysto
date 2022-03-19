@@ -355,6 +355,8 @@ where
                         Ok(dep) => dep.await,
                         _ => panic!("Error occurred on start of Agent with ID: {}.", aid),
                     }
+
+                    agent.after_start().await;
                 })
             })
             .collect();
@@ -370,6 +372,8 @@ where
                         Ok(dep) => dep.await,
                         _ => panic!("Error occurred on start of Table Agent with ID: {}.", aid),
                     }
+
+                    agent.after_start().await;
                 })
             })
             .collect();

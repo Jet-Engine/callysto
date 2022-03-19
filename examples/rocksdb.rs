@@ -57,7 +57,7 @@ fn main() {
     let mut app = Callysto::default();
     // Configure application.
     app.with_name("durable-app")
-        .with_storage("rocksdb:///home/vcq/projects/calstorage");
+        .with_storage("rocksdb:///home/theo/projects/calstorage");
 
     // Create all the tables that we need.
     let mut tables = Tables::new();

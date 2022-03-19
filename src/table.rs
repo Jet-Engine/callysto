@@ -22,7 +22,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
+use std::time::Duration;
+use futures_timer::Delay;
+use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
@@ -57,9 +59,6 @@ where
             format!("{}-{}-changelog", app_name, table_name),
             client_config,
         );
-
-
-
 
         let changelog_consumer = changelog_topic.consumer();
 
@@ -169,7 +168,8 @@ where
                 let changelog_topic_meta = stat
                     .topics
                     .get(self.changelog_topic.topic_name().as_str())
-                    .ok_or(CallystoError::GeneralError(
+                    .ok_or(CallystoError::NoTopic(
+                        self.changelog_topic.topic_name(),
                         "Changelog topic is not found in metadata.".into(),
                     ))?;
                 let source_n = source_topic_meta.partitions.len() - 1;
@@ -185,26 +185,52 @@ where
                     ));
                 }
             }
-            _ => return Err(GeneralError("No stat has been received".into())),
+            _ => return Err(CallystoError::ConsumerNoStat("No stat has been received".into())),
         }
-
-        // let changelog_topic_stats = self.changelog_consumer.get().consumer_context.get_stats();
-        // let changelog_n = match &*changelog_topic_stats {
-        //     Some(stat) => {
-        //         let x = stat
-        //             .topics
-        //             .get(self.changelog_topic.topic_name().as_str())
-        //             .unwrap();
-        //         x.partitions.len()
-        //     }
-        //     _ => {
-        //         return Err(GeneralError(
-        //             "No stat has been received for changelog topic".into(),
-        //         ))
-        //     }
-        // };
-
         info!("Source <> Changelog partitions are matching");
+
+        Ok(())
+    }
+
+    async fn after_start_callback(&self) -> Result<()> {
+        loop {
+            match self.verify_source_topic_partitions() {
+                Ok(_) => {},
+                Err(e) => {
+                    error!("{:?}", e);
+                    info!("Changelog topic hasn't been created. Creating...");
+                    let source_topic_ccontext = self
+                        .source_topic_consumer_context
+                        .get()
+                        .as_ref()
+                        .to_owned()
+                        .unwrap();
+
+                    let source_topic_name = source_topic_ccontext.topic_name.clone();
+                    let source_topic_stats = source_topic_ccontext.get_stats();
+
+                    match &*source_topic_stats {
+                        Some(s) => {
+                            let source_topic_meta = s
+                                .topics
+                                .get(source_topic_name.as_str())
+                                .ok_or(CallystoError::NoTopic(
+                                    source_topic_name,
+                                    "Source topic is not found in metadata.".into(),
+                                )).unwrap();
+                            let source_n = source_topic_meta.partitions.len() - 1;
+
+                            self.changelog_topic
+                                .topic_declare(false, false, 0_f64, source_n)
+                                .await?;
+
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -256,7 +282,15 @@ where
     }
 
     fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>> {
-        self.verify_source_topic_partitions()?;
+        self.verify_source_topic_partitions().or_else(|e| {
+            match e {
+                CallystoError::NoTopic(topic_name, _) if topic_name.contains("changelog") => {
+                    info!("Changelog topic hasn't been created yet.");
+                    Ok(())
+                }
+                _ => Err(e)
+            }
+        })?;
         Ok(Some(msg.partition() as usize))
     }
 }
@@ -380,6 +414,11 @@ where
         };
 
         Ok(closure.boxed())
+    }
+
+    async fn after_start(&self) -> Result<()> {
+        self.after_start_callback();
+        Ok(())
     }
 
     async fn restart(&self) -> Result<()> {

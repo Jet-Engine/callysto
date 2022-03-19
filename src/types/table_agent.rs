@@ -108,25 +108,28 @@ where
     F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
+
     async fn call(&self, st: Context<State>) -> Result<State> {
         Ok(self.state.clone())
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let closure = async move {
-            for (table_name, table) in &self.tables {
-                table.start().await.unwrap().await;
-                info!("CTable: `{}` table launched", table_name);
-            }
-
             let consumer = self.topic.consumer();
 
+            info!("Assigning consumer contexts for source topic `{}` statistics", self.topic.topic_name());
             // Assign consumer contexts to get the statistics data
             self.tables.iter().for_each(|(name, table)| {
                 table
                     .source_topic_consumer_context
                     .replace_with(|_| Some(consumer.consumer_context.clone()));
             });
+            info!("Assigned consumer contexts for source topic `{}` statistics", self.topic.topic_name());
+
+            for (table_name, table) in &self.tables {
+                table.start().await.unwrap().await;
+                info!("CTable: `{}` table launched", table_name);
+            }
 
             info!(
                 "Started Table Agent - Consumer Group `{}` - Topic `{}`",
@@ -164,6 +167,14 @@ where
         };
 
         Ok(closure.boxed())
+    }
+
+    async fn after_start(&self) -> Result<()> {
+        for (table_name, table) in &self.tables {
+            table.after_start().await?;
+        }
+
+        Ok(())
     }
 
     async fn restart(&self) -> Result<()> {

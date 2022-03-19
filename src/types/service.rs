@@ -40,6 +40,10 @@ where
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>>;
 
+    async fn after_start(&self) -> Result<()> {
+        Ok(())
+    }
+
     async fn restart(&self) -> Result<()>;
 
     async fn crash(&self);
