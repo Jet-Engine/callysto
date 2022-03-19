@@ -15,15 +15,15 @@ use rdkafka::util::AsyncRuntime;
 use rdkafka::ClientConfig;
 use tracing::error;
 
-use crate::kafka::runtime::BastionRuntime;
+use crate::kafka::runtime::NucleiRuntime;
 
 pub struct CConsumer {
-    pub(super) consumer: StreamConsumer<CConsumerContext, BastionRuntime>,
+    pub(super) consumer: StreamConsumer<CConsumerContext, NucleiRuntime>,
     pub consumer_context: CConsumerContext,
 }
 
 impl CConsumer {
-    pub fn stream(&self) -> MessageStream<'_, CConsumerContext, BastionRuntime> {
+    pub fn stream(&self) -> MessageStream<'_, CConsumerContext, NucleiRuntime> {
         self.consumer.stream()
     }
 

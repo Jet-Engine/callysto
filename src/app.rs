@@ -7,11 +7,11 @@ use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use bastion::spawn;
 use futures::future::join_all;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
+use nuclei::join_handle::JoinHandle;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
@@ -22,7 +22,7 @@ use url::Url;
 
 use crate::config::Config;
 use crate::errors::Result as CResult;
-use crate::kafka::{ctopic::*, runtime::BastionRuntime};
+use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
 use crate::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
@@ -344,13 +344,13 @@ where
             .with_env_filter(EnvFilter::from_default_env())
             .init();
 
-        let mut agents: Vec<RecoverableHandle<()>> = self
+        let mut agents: Vec<JoinHandle<()>> = self
             .agents
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Agent with ID: {}", aid);
                 // TODO: Recovery should be here.
-                bastion::executor::spawn(async move {
+                nuclei::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,
                         _ => panic!("Error occurred on start of Agent with ID: {}.", aid),
@@ -359,13 +359,13 @@ where
             })
             .collect();
 
-        let table_agents: Vec<RecoverableHandle<()>> = self
+        let table_agents: Vec<JoinHandle<()>> = self
             .table_agents
             .iter()
             .map(|(aid, agent)| {
                 info!("Starting Table Agent with ID: {}", aid);
                 // TODO: Recovery should be here.
-                bastion::executor::spawn(async move {
+                nuclei::spawn(async move {
                     match agent.start().await {
                         Ok(dep) => dep.await,
                         _ => panic!("Error occurred on start of Table Agent with ID: {}.", aid),
@@ -376,6 +376,6 @@ where
 
         agents.extend(table_agents);
 
-        bastion::executor::run(join_all(agents));
+        nuclei::block_on(join_all(agents));
     }
 }

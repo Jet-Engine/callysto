@@ -21,7 +21,7 @@ use tracing::error;
 use crate::kafka::cconsumer::CConsumer;
 use crate::kafka::contexts::CConsumerContext;
 use crate::kafka::cproducer::CProducer;
-use crate::kafka::runtime::BastionRuntime;
+use crate::kafka::runtime::NucleiRuntime;
 
 #[derive(Clone)]
 pub struct CTopic {
@@ -46,7 +46,7 @@ impl CTopic {
 
     pub fn consumer(&self) -> CConsumer {
         let consumer_context = CConsumerContext::new(self.topic.clone());
-        let consumer: StreamConsumer<_, BastionRuntime> = self
+        let consumer: StreamConsumer<_, NucleiRuntime> = self
             .client_config
             .create_with_context(consumer_context.clone())
             .expect("Consumer creation failed");

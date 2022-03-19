@@ -1,0 +1,10 @@
+#rustflags = [
+#    "-C", "linker=clang-gold", "-C", "link-arg=-fuse-ld=gold", "-C", "target-cpu=native"
+#]
+# cascadelake. clearlinux. gold.
+
+rustflags = [
+    "-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold", "-C", "target-cpu=native"
+]
+
+# cascadelake. openSUSE Tumbleweed. mold.

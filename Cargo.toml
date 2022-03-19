@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bastion = { git = "https://github.com/bastion-rs/bastion.git" }
+nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
 lightproc = "0.3.5"
 lever = "0.1.2"
 thiserror = "1.0"

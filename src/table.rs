@@ -57,7 +57,12 @@ where
             format!("{}-{}-changelog", app_name, table_name),
             client_config,
         );
+
+
+
+
         let changelog_consumer = changelog_topic.consumer();
+
         Ok(Self {
             app_name,
             table_name,
@@ -234,7 +239,7 @@ where
     ) -> Result<()> {
         let topic = self.changelog_topic.clone();
 
-        let handle = bastion::executor::blocking(async move {
+        let handle = nuclei::spawn(async move {
             let producer = topic.producer();
             let topic_name = topic.topic_name();
             let serialized_key = serialized_key.clone();
@@ -284,7 +289,7 @@ where
                 .await;
         };
 
-        bastion::executor::spawn(clo);
+        nuclei::spawn(clo);
 
         Ok(())
     }
@@ -303,7 +308,7 @@ where
                 .await;
         };
 
-        bastion::executor::spawn(clo);
+        nuclei::spawn(clo);
 
         Ok(())
     }
