@@ -148,9 +148,7 @@ where
                     }
                     let state = self.state.clone();
                     let tables = self.tables.clone();
-                    info!("Waiting for a message.");
                     let message = consumer.recv().await;
-                    info!("Message received.");
                     if message.is_none() {
                         // Error while receiving from Kafka.
                         break 'fallback;

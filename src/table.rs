@@ -243,6 +243,7 @@ where
     }
 
     fn start_changelog_worker(&self) -> Result<()> {
+        info!("`{}` Changelog worker started!", self.changelog_topic_name());
         let rx = self.changelog_rx.clone();
         let topic = self.changelog_topic.clone();
 
@@ -316,7 +317,7 @@ where
     }
 
     fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>> {
-        self.verify_source_topic_partitions()?;
+        self.verify_source_topic_partitions();
         Ok(Some(msg.partition() as usize))
     }
 }
@@ -452,7 +453,8 @@ where
     }
 
     async fn after_start(&self) -> Result<()> {
-        self.after_start_callback();
+        info!("After Start - Table `{}` - Changelog Topic `{}`", self.table_name, self.changelog_topic_name());
+        self.after_start_callback().await;
         Ok(())
     }
 
