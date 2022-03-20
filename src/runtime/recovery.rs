@@ -51,10 +51,8 @@ where
     }
 
     async fn consume_changelogs(&self) -> Result<Vec<JoinHandle<()>>> {
-        info!("ABOUT TO START");
         let tables = self.tables.clone();
         let consumers: Vec<(Arc<CTable<State>>, Arc<CConsumer>)> = self.tables.iter().map(|(_, table)| {
-            info!("GETTING CONSUMERS");
             let consumer = table.changelog_topic.consumer();
             (table, Arc::new(consumer))
         }).collect();
@@ -86,32 +84,6 @@ where
                 info!("Recovery finished for changelog topic: `{}`. `{}` elements written.", table.changelog_topic_name(), element_count);
             })
         }).collect();
-        // for (table, consumer) in consumers.into_iter() {
-        //     info!("Recovery is starting for changelog topic: `{}`", table.changelog_topic_name());
-        //     let changelog_topic_name = table.changelog_topic_name();
-        //     let table = table.to_owned();
-        //     let consumer = consumer.clone();
-        //     nuclei::spawn(async move {
-        //         info!("Recovery started for changelog topic: `{}`", changelog_topic_name);
-        //         let mut element_count = 0_usize;
-        //         let mut message_stream = consumer.stream().ready_chunks(10);
-        //         while let Some(messages) = message_stream.next().await {
-        //             let msgs: Vec<OwnedMessage> = messages.iter().flat_map(|rm| {
-        //                 match rm {
-        //                     Ok(bm) => Some(bm.detach()),
-        //                     Err(e) => {
-        //                         error!("{}", e);
-        //                         None
-        //                     }
-        //                 }
-        //             }).collect();
-        //             element_count += msgs.len();
-        //             info!("Recovery wrote `{}` elements.", element_count);
-        //             table.apply_changelog_batch(msgs);
-        //         }
-        //         info!("Recovery finished for changelog topic: `{}`. `{}` elements written.", table.changelog_topic_name(), element_count);
-        //     });
-        // }
 
         Ok(tasks)
     }
