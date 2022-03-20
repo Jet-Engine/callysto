@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
+use lever::prelude::LOTable;
 use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 
@@ -108,25 +109,28 @@ where
     F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
+
     async fn call(&self, st: Context<State>) -> Result<State> {
         Ok(self.state.clone())
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let closure = async move {
-            for (table_name, table) in &self.tables {
-                table.start().await.unwrap().await;
-                info!("CTable: `{}` table launched", table_name);
-            }
-
             let consumer = self.topic.consumer();
 
+            info!("Assigning consumer contexts for source topic `{}` statistics", self.topic.topic_name());
             // Assign consumer contexts to get the statistics data
             self.tables.iter().for_each(|(name, table)| {
                 table
                     .source_topic_consumer_context
                     .replace_with(|_| Some(consumer.consumer_context.clone()));
             });
+            info!("Assigned consumer contexts for source topic `{}` statistics", self.topic.topic_name());
+
+            for (table_name, table) in &self.tables {
+                table.start().await.unwrap().await;
+                info!("CTable: `{}` table launched", table_name);
+            }
 
             info!(
                 "Started Table Agent - Consumer Group `{}` - Topic `{}`",
@@ -146,6 +150,10 @@ where
                     let state = self.state.clone();
                     let tables = self.tables.clone();
                     let message = consumer.recv().await;
+                    if message.is_none() {
+                        // Error while receiving from Kafka.
+                        break 'fallback;
+                    }
                     let context = Context::new(state);
                     match TableAgent::<State>::call(self, message, tables, context).await {
                         Err(e) => {
@@ -166,40 +174,8 @@ where
         Ok(closure.boxed())
     }
 
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
-        Ok(())
-    }
-
-    async fn crash(&self) {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn stop(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Stopped);
-        todo!()
-    }
-
     async fn wait_until_stopped(&self) {
         todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -212,9 +188,5 @@ where
 
     async fn shortlabel(&self) -> String {
         format!("table-agent:{}", self.agent_name)
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

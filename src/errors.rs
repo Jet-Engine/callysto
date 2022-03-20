@@ -18,6 +18,12 @@ pub enum CallystoError {
     #[error("Binary Serialization error: {0}")]
     BinSerializationError(#[from] bincode::Error),
 
+    #[error("No Consumer Stat: {0}")]
+    ConsumerNoStat(String),
+
+    #[error("No Topic named: {0}. Err: {1}")]
+    NoTopic(String, String),
+
     #[error("Serde JSON error: {0}")]
     SerdeJsonError(#[from] serde_json::Error),
 

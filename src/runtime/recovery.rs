@@ -1,16 +1,92 @@
+use std::collections::HashMap;
 use crate::errors::*;
-use crate::prelude::{Context, ServiceState};
+use crate::prelude::{Context, ServiceState, Tables};
 use crate::types::service::Service;
 use async_trait::async_trait;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, join_all};
 use lever::sync::atomics::AtomicBox;
 use std::sync::Arc;
+use futures::{SinkExt, StreamExt};
+use rdkafka::error::KafkaResult;
+use rdkafka::message::{BorrowedMessage, OwnedMessage};
+use tracing::{error, info};
+use crate::kafka::cconsumer::CConsumer;
+use crate::stores::store::Store;
+use crate::types::collection::Collection;
+use crate::table::CTable;
+use futures::FutureExt;
+use lever::prelude::LOTable;
+use nuclei::join_handle::JoinHandle;
+
+
+type ConcurrentTables<State> = LOTable<String, Arc<CTable<State>>>;
+
 
 pub struct RecoveryService<State>
 where
     State: Clone + Send + Sync + 'static,
 {
+    app_name: String,
+    state: State,
+    tables: ConcurrentTables<State>,
     dependencies: Vec<Arc<dyn Service<State>>>,
+}
+
+impl<State> RecoveryService<State>
+where
+    State: Clone + Send + Sync + 'static,
+{
+    pub fn new(
+        app_name: String,
+        state: State,
+        tables: ConcurrentTables<State>,
+        dependencies: Vec<Arc<dyn Service<State>>>,
+    ) -> Self {
+        Self {
+            app_name,
+            state,
+            tables,
+            dependencies
+        }
+    }
+
+    async fn consume_changelogs(&self) -> Result<Vec<JoinHandle<()>>> {
+        let tables = self.tables.clone();
+        let consumers: Vec<(Arc<CTable<State>>, Arc<CConsumer>)> = self.tables.iter().map(|(_, table)| {
+            let consumer = table.changelog_topic.consumer();
+            (table, Arc::new(consumer))
+        }).collect();
+
+        let tasks: Vec<JoinHandle<()>> = consumers.into_iter().map(|(table, consumer)| {
+            info!("Recovery is starting for changelog topic: `{}`", table.changelog_topic_name());
+            let changelog_topic_name = table.changelog_topic_name();
+            let table = table.to_owned();
+            let consumer = consumer.clone();
+            nuclei::spawn(async move {
+                info!("Recovery started for changelog topic: `{}`", changelog_topic_name);
+                let mut element_count = 0_usize;
+                let mut message_stream = consumer.stream().ready_chunks(10);
+                while let Some(messages) = message_stream.next().await {
+                    info!("Recovery received `{}` changelog objects.", messages.len());
+                    let msgs: Vec<OwnedMessage> = messages.iter().flat_map(|rm| {
+                        match rm {
+                            Ok(bm) => Some(bm.detach()),
+                            Err(e) => {
+                                error!("{}", e);
+                                None
+                            }
+                        }
+                    }).collect();
+                    element_count += msgs.len();
+                    info!("Recovery wrote `{}` elements.", element_count);
+                    table.apply_changelog_batch(msgs);
+                }
+                info!("Recovery finished for changelog topic: `{}`. `{}` elements written.", table.changelog_topic_name(), element_count);
+            })
+        }).collect();
+
+        Ok(tasks)
+    }
 }
 
 #[async_trait]
@@ -23,38 +99,49 @@ where
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
-        todo!()
-    }
+        let closure = async move {
+            for x in &self.dependencies {
+                info!("RecoveryService - {} - Dependencies are starting", self.app_name);
+                x.start().await;
+            }
 
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
+            info!(
+                "Started Recovery Service - Consumer Group `{}`",
+                self.app_name
+            );
 
-        Ok(())
-    }
+            'fallback: loop {
+                info!("Launched Recovery Service worker.");
+                self.service_state()
+                    .await
+                    .replace_with(|e| ServiceState::Running);
+                'main: loop {
+                    if self.stopped().await {
+                        break 'main;
+                    }
+                    match self.consume_changelogs().await {
+                        Ok(tasks) => {
+                            join_all(tasks).await;
+                        }
+                        Err(e) => {
+                            error!("Changelog Service failed: {:?}", e);
+                            self.crash().await;
+                            break 'main;
+                        }
+                    }
+                }
 
-    async fn crash(&self) {
-        todo!()
-    }
+                if self.stopped().await {
+                    break 'fallback;
+                }
+            }
+        };
 
-    async fn stop(&self) -> Result<()> {
-        todo!()
+        Ok(closure.boxed())
+
     }
 
     async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn started(&self) -> bool {
-        todo!()
-    }
-
-    async fn stopped(&self) -> bool {
-        todo!()
-    }
-
-    async fn crashed(&self) -> bool {
         todo!()
     }
 
@@ -63,14 +150,10 @@ where
     }
 
     async fn label(&self) -> String {
-        todo!()
+        format!("{}@{}", self.app_name, self.shortlabel().await)
     }
 
     async fn shortlabel(&self) -> String {
-        todo!()
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        todo!()
+        String::from("recovery-service")
     }
 }

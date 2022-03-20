@@ -21,12 +21,13 @@ use tracing::error;
 use crate::kafka::cconsumer::CConsumer;
 use crate::kafka::contexts::CConsumerContext;
 use crate::kafka::cproducer::CProducer;
-use crate::kafka::runtime::BastionRuntime;
+use crate::kafka::runtime::NucleiRuntime;
 
 #[derive(Clone)]
 pub struct CTopic {
     topic: String,
     client_config: ClientConfig,
+    admin_client: CAdminClient,
 }
 
 impl CTopic {
@@ -34,9 +35,15 @@ impl CTopic {
     where
         T: AsRef<str>,
     {
+        let admin_client = CAdminClient::new(
+            client_config.clone(),
+            CConsumerContext::new(topic.as_ref().to_string()),
+        );
+
         Self {
             topic: topic.as_ref().to_owned(),
             client_config,
+            admin_client
         }
     }
 
@@ -46,7 +53,7 @@ impl CTopic {
 
     pub fn consumer(&self) -> CConsumer {
         let consumer_context = CConsumerContext::new(self.topic.clone());
-        let consumer: StreamConsumer<_, BastionRuntime> = self
+        let consumer: StreamConsumer<_, NucleiRuntime> = self
             .client_config
             .create_with_context(consumer_context.clone())
             .expect("Consumer creation failed");
@@ -59,10 +66,7 @@ impl CTopic {
     }
 
     pub fn admin_client(&self) -> CAdminClient {
-        CAdminClient::new(
-            self.client_config.clone(),
-            CConsumerContext::new(self.topic.clone()),
-        )
+        self.admin_client.clone()
     }
 
     pub fn producer(&self) -> CProducer {
@@ -80,7 +84,7 @@ impl CTopic {
         retention: f64,
         partitions: usize,
     ) -> Result<Vec<TopicResult>> {
-        let manager = self.admin_client().manager();
+        let manager = self.admin_client.manager();
         let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(1)));
         let topic_name = self.topic.clone();
 

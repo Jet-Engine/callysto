@@ -4,6 +4,7 @@ use rdkafka::admin::AdminClient;
 use rdkafka::ClientConfig;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct CAdminClient {
     admin_client: Arc<AtomicBox<AdminClient<CConsumerContext>>>,
     pub consumer_context: CConsumerContext,

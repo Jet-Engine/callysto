@@ -9,7 +9,7 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tracing::debug;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CConsumerContext {
     pub topic_name: String,
     statistics: Arc<AtomicBox<Option<CStatistics>>>,

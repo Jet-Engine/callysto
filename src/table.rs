@@ -13,7 +13,7 @@ use crate::types::service::{Service, ServiceState};
 use crate::types::table_agent::TableAgent;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{FutureExt, SinkExt};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
@@ -22,7 +22,11 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
+use std::sync::mpsc::channel;
+use std::time::Duration;
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use futures_timer::Delay;
+use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
@@ -37,7 +41,8 @@ where
     config: Config,
     pub source_topic_consumer_context: Arc<AtomicBox<Option<CConsumerContext>>>,
     pub changelog_topic: CTopic,
-    pub changelog_consumer: Arc<AtomicBox<CConsumer>>,
+    pub changelog_tx: Sender<(usize, Vec<u8>, Vec<u8>)>,
+    pub changelog_rx: Receiver<(usize, Vec<u8>, Vec<u8>)>,
     data: Arc<dyn Store<State>>,
 }
 
@@ -57,7 +62,9 @@ where
             format!("{}-{}-changelog", app_name, table_name),
             client_config,
         );
-        let changelog_consumer = changelog_topic.consumer();
+
+        let (changelog_tx, changelog_rx) = unbounded::<(usize, Vec<u8>, Vec<u8>)>();
+
         Ok(Self {
             app_name,
             table_name,
@@ -65,7 +72,8 @@ where
             config,
             source_topic_consumer_context: Arc::new(AtomicBox::new(None)),
             changelog_topic,
-            changelog_consumer: Arc::new(AtomicBox::new(changelog_consumer)),
+            changelog_tx,
+            changelog_rx,
             data,
         })
     }
@@ -164,7 +172,8 @@ where
                 let changelog_topic_meta = stat
                     .topics
                     .get(self.changelog_topic.topic_name().as_str())
-                    .ok_or(CallystoError::GeneralError(
+                    .ok_or(CallystoError::NoTopic(
+                        self.changelog_topic.topic_name(),
                         "Changelog topic is not found in metadata.".into(),
                     ))?;
                 let source_n = source_topic_meta.partitions.len() - 1;
@@ -180,26 +189,78 @@ where
                     ));
                 }
             }
-            _ => return Err(GeneralError("No stat has been received".into())),
+            _ => return Err(CallystoError::ConsumerNoStat("No stat has been received".into())),
+        }
+        info!("Source <> Changelog partitions are matching");
+
+        Ok(())
+    }
+
+    async fn after_start_callback(&self) -> Result<()> {
+        loop {
+            match self.verify_source_topic_partitions() {
+                Ok(_) => {},
+                Err(e) => {
+                    error!("{:?}", e);
+                    info!("Changelog topic hasn't been created. Creating...");
+                    let source_topic_ccontext = self
+                        .source_topic_consumer_context
+                        .get()
+                        .as_ref()
+                        .to_owned()
+                        .unwrap();
+
+                    let source_topic_name = source_topic_ccontext.topic_name.clone();
+                    let source_topic_stats = source_topic_ccontext.get_stats();
+
+                    match &*source_topic_stats {
+                        Some(s) => {
+                            let source_topic_meta = s
+                                .topics
+                                .get(source_topic_name.as_str())
+                                .ok_or(CallystoError::NoTopic(
+                                    source_topic_name,
+                                    "Source topic is not found in metadata.".into(),
+                                )).unwrap();
+                            let source_n = source_topic_meta.partitions.len() - 1;
+
+                            self.changelog_topic
+                                .topic_declare(false, false, 0_f64, source_n)
+                                .await?;
+
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
 
-        // let changelog_topic_stats = self.changelog_consumer.get().consumer_context.get_stats();
-        // let changelog_n = match &*changelog_topic_stats {
-        //     Some(stat) => {
-        //         let x = stat
-        //             .topics
-        //             .get(self.changelog_topic.topic_name().as_str())
-        //             .unwrap();
-        //         x.partitions.len()
-        //     }
-        //     _ => {
-        //         return Err(GeneralError(
-        //             "No stat has been received for changelog topic".into(),
-        //         ))
-        //     }
-        // };
+        Ok(())
+    }
 
-        info!("Source <> Changelog partitions are matching");
+    fn start_changelog_worker(&self) -> Result<()> {
+        info!("`{}` Changelog worker started!", self.changelog_topic_name());
+        let rx = self.changelog_rx.clone();
+        let topic = self.changelog_topic.clone();
+
+        nuclei::spawn(async move {
+            let producer = topic.producer();
+            loop {
+                match rx.recv() {
+                    Ok((partition, serialized_key, serialized_value)) => {
+                        let topic_name = topic.topic_name();
+                        let serialized_key = serialized_key.clone();
+                        let serialized_value = serialized_value.clone();
+
+                        producer
+                            .send(topic_name, partition, serialized_key, serialized_value)
+                            .await;
+                    }
+                    _ => {}
+                }
+            }
+        });
 
         Ok(())
     }
@@ -232,26 +293,12 @@ where
         serialized_key: Vec<u8>,
         serialized_value: Vec<u8>,
     ) -> Result<()> {
-        let topic = self.changelog_topic.clone();
-
-        let handle = bastion::executor::blocking(async move {
-            let producer = topic.producer();
-            let topic_name = topic.topic_name();
-            let serialized_key = serialized_key.clone();
-            let serialized_value = serialized_value.clone();
-
-            producer
-                .send(topic_name, partition, serialized_key, serialized_value)
-                .await
-        });
-
-        handle.await;
-
+        self.changelog_tx.send((partition, serialized_key, serialized_value));
         Ok(())
     }
 
     fn partition_for_key(&self, key: Vec<u8>, msg: OwnedMessage) -> Result<Option<usize>> {
-        self.verify_source_topic_partitions()?;
+        self.verify_source_topic_partitions();
         Ok(Some(msg.partition() as usize))
     }
 }
@@ -274,7 +321,14 @@ where
         self.data
             .set(serialized_key.clone(), serialized_val.clone(), msg.clone())?;
         let partition_for_key = self
-            .partition_for_key(serialized_key.clone(), msg)?
+            .partition_for_key(serialized_key.clone(), msg.clone())
+            .or_else::<CallystoError, _>(|e| {
+                // Since it's failed to verify partition, we still queue for a later time when changelog topic is available.
+                // Or any other error occurs.
+                error!("{:?}", e);
+                Ok(Some(msg.partition() as _))
+            })
+            .unwrap()
             .unwrap();
 
         let dispatch = self.clone();
@@ -284,7 +338,7 @@ where
                 .await;
         };
 
-        bastion::executor::spawn(clo);
+        nuclei::spawn(clo);
 
         Ok(())
     }
@@ -303,7 +357,7 @@ where
                 .await;
         };
 
-        bastion::executor::spawn(clo);
+        nuclei::spawn(clo);
 
         Ok(())
     }
@@ -372,43 +426,21 @@ where
                 self.changelog_topic_name()
             );
             self.data.start().await;
+            // Start changelog worker
+            self.start_changelog_worker();
         };
 
         Ok(closure.boxed())
     }
 
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
-
+    async fn after_start(&self) -> Result<()> {
+        info!("After Start - Table `{}` - Changelog Topic `{}`", self.table_name, self.changelog_topic_name());
+        self.after_start_callback().await;
         Ok(())
-    }
-
-    async fn crash(&self) {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn stop(&self) -> Result<()> {
-        todo!()
     }
 
     async fn wait_until_stopped(&self) {
         todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -425,9 +457,5 @@ where
 
     async fn shortlabel(&self) -> String {
         format!("table:{}", self.table_name)
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

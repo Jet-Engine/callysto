@@ -1,9 +1,6 @@
 use callysto::prelude::message::*;
 use callysto::prelude::*;
 use std;
-use std::fs::File;
-use std::io::BufRead;
-use std::path::Path;
 
 async fn durable_agent(
     msg: Option<OwnedMessage>,
@@ -18,46 +15,22 @@ async fn durable_agent(
         if num % 2 == 0 {
             let even_numbers = tables.get("even_numbers").unwrap();
             even_numbers.set(num, num, m).unwrap();
-
-            // Database is created, and started to be filled in.
-            // let even_numbers_db_log = read_lines(
-            //     "/home/vcq/projects/calstorage/durable-app-even_numbers-0.db/LOG",
-            // )
-            // .unwrap();
-            // for l in even_numbers_db_log.take(10) {
-            //     println!("{}", l.unwrap());
-            // }
         } else {
-            let even_numbers = tables.get("odd_numbers").unwrap();
-            even_numbers.set(num, num, m).unwrap();
-
-            // Database is created, and started to be filled in.
-            // let odd_numbers_db_log = read_lines(
-            //     "/home/vcq/projects/calstorage/durable-app-odd_numbers-0.db/LOG",
-            // )
-            // .unwrap();
-            // for l in odd_numbers_db_log.take(10) {
-            //     println!("{}", l.unwrap());
-            // }
+            let odd_numbers = tables.get("odd_numbers").unwrap();
+            odd_numbers.set(num, num, m).unwrap();
         }
     });
 
     Ok(())
 }
 
-fn read_lines<P>(filename: P) -> std::io::Result<std::io::Lines<std::io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(std::io::BufReader::new(file).lines())
-}
-
 fn main() {
     let mut app = Callysto::default();
+    let home = std::env::home_dir().unwrap();
+    let home = home.to_string_lossy();
     // Configure application.
     app.with_name("durable-app")
-        .with_storage("rocksdb:///home/vcq/projects/calstorage");
+        .with_storage(format!("rocksdb://{}/projects/calstorage", home));
 
     // Create all the tables that we need.
     let mut tables = Tables::new();

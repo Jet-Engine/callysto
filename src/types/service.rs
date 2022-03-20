@@ -40,19 +40,45 @@ where
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>>;
 
-    async fn restart(&self) -> Result<()>;
+    async fn after_start(&self) -> Result<()> {
+        Ok(())
+    }
 
-    async fn crash(&self);
+    async fn restart(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Restarting);
 
-    async fn stop(&self) -> Result<()>;
+        Ok(())
+    }
+
+    async fn crash(&self) {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Crashed);
+    }
+
+    async fn stop(&self) -> Result<()> {
+        self.service_state()
+            .await
+            .replace_with(|e| ServiceState::Stopped);
+
+        Ok(())
+    }
 
     async fn wait_until_stopped(&self);
 
-    async fn started(&self) -> bool;
+    async fn started(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Running
+    }
 
-    async fn stopped(&self) -> bool;
+    async fn stopped(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Stopped
+    }
 
-    async fn crashed(&self) -> bool;
+    async fn crashed(&self) -> bool {
+        *self.service_state().await.get() == ServiceState::Crashed
+    }
 
     async fn state(&self) -> String;
 
@@ -61,7 +87,9 @@ where
     async fn shortlabel(&self) -> String;
 
     // Provider methods
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>>;
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        Arc::new(AtomicBox::new(ServiceState::PreStart))
+    }
 }
 
 ///////////////////////////////////////////////////
