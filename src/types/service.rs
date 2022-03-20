@@ -87,7 +87,9 @@ where
     async fn shortlabel(&self) -> String;
 
     // Provider methods
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>>;
+    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
+        Arc::new(AtomicBox::new(ServiceState::PreStart))
+    }
 }
 
 ///////////////////////////////////////////////////

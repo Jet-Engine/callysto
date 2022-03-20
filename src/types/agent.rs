@@ -163,8 +163,4 @@ where
     async fn shortlabel(&self) -> String {
         format!("agent:{}", self.agent_name)
     }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        Arc::new(AtomicBox::new(ServiceState::PreStart))
-    }
 }

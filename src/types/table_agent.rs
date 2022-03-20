@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
+use lever::prelude::LOTable;
 use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 
@@ -173,48 +174,8 @@ where
         Ok(closure.boxed())
     }
 
-    async fn after_start(&self) -> Result<()> {
-        for (table_name, table) in &self.tables {
-            table.after_start().await?;
-        }
-
-        Ok(())
-    }
-
-    async fn restart(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Restarting);
-        Ok(())
-    }
-
-    async fn crash(&self) {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn stop(&self) -> Result<()> {
-        self.service_state()
-            .await
-            .replace_with(|e| ServiceState::Stopped);
-        todo!()
-    }
-
     async fn wait_until_stopped(&self) {
         todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *self.service_state().await.get() == ServiceState::Crashed
     }
 
     async fn state(&self) -> String {
@@ -227,9 +188,5 @@ where
 
     async fn shortlabel(&self) -> String {
         format!("table-agent:{}", self.agent_name)
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

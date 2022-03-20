@@ -41,7 +41,6 @@ where
     config: Config,
     pub source_topic_consumer_context: Arc<AtomicBox<Option<CConsumerContext>>>,
     pub changelog_topic: CTopic,
-    pub changelog_consumer: Arc<AtomicBox<CConsumer>>,
     pub changelog_tx: Sender<(usize, Vec<u8>, Vec<u8>)>,
     pub changelog_rx: Receiver<(usize, Vec<u8>, Vec<u8>)>,
     data: Arc<dyn Store<State>>,
@@ -64,7 +63,6 @@ where
             client_config,
         );
 
-        let changelog_consumer = changelog_topic.consumer();
         let (changelog_tx, changelog_rx) = unbounded::<(usize, Vec<u8>, Vec<u8>)>();
 
         Ok(Self {
@@ -76,7 +74,6 @@ where
             changelog_topic,
             changelog_tx,
             changelog_rx,
-            changelog_consumer: Arc::new(AtomicBox::new(changelog_consumer)),
             data,
         })
     }
@@ -297,22 +294,6 @@ where
         serialized_value: Vec<u8>,
     ) -> Result<()> {
         self.changelog_tx.send((partition, serialized_key, serialized_value));
-
-        // let topic = self.changelog_topic.clone();
-        //
-        // let handle = nuclei::spawn(async move {
-        //     let producer = topic.producer();
-        //     let topic_name = topic.topic_name();
-        //     let serialized_key = serialized_key.clone();
-        //     let serialized_value = serialized_value.clone();
-        //
-        //     producer
-        //         .send(topic_name, partition, serialized_key, serialized_value)
-        //         .await;
-        // });
-        //
-        // handle.await;
-
         Ok(())
     }
 
@@ -476,9 +457,5 @@ where
 
     async fn shortlabel(&self) -> String {
         format!("table:{}", self.table_name)
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        Arc::new(AtomicBox::new(ServiceState::PreStart))
     }
 }

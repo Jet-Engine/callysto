@@ -23,6 +23,7 @@ use url::Url;
 use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
+use crate::runtime::recovery::RecoveryService;
 use crate::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
@@ -149,12 +150,6 @@ where
         F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
-        // println!("BOMBARDIER");
-        // println!("ASSIGN SOURCE BEFORE CALL: {:?}", tables.len());
-        // for (_, mut table) in tables.iter_mut() {
-        //     println!("ASSIGN SOURCE TOPIC CALLED");
-        //     table.assign_source_topic(topic.clone());
-        // }
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         let table_agent = CTableAgent::new(
             clo,
@@ -326,23 +321,51 @@ where
         if self.storage_url.is_none() {
             panic!("Tables can't be used without storage backend. Bailing...");
         }
-        CTable::new(
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let table = CTable::new(
             self.app_name.clone(),
             self.storage_url.clone().unwrap(),
             table_name.as_ref().into(),
             self.config.clone(),
             self.build_client_config(),
         )
-        .expect("Table build failed.")
+        .expect("Table build failed.");
+
+        self.tables.insert(table_name.as_ref().into(), Arc::new(table.clone()));
+        table
     }
 
     // TODO: page method to serve
     // TODO: table_route method to give data based on page slug
 
+    fn background_workers(&self) -> CResult<()> {
+        // Add Recovery Service
+        self.service(RecoveryService::new(
+            self.app_name.clone(),
+            self.state.clone(),
+            self.tables.clone(),
+            self.tables.values().map(|e| e as Arc<dyn Service<State>>).collect::<Vec<_>>()
+        ));
+
+        Ok(())
+    }
+
     pub fn run(self) {
         tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .init();
+
+        // Load all background workers
+        self.background_workers();
+
+        let mut workers: Vec<JoinHandle<()>> = Vec::with_capacity(
+            self.agents.len() +
+                self.services.len() +
+                self.table_agents.len() +
+                self.cronjobs.len() +
+                self.tasks.len() +
+                self.timers.len()
+        );
 
         let mut agents: Vec<JoinHandle<()>> = self
             .agents
@@ -378,8 +401,27 @@ where
             })
             .collect();
 
-        agents.extend(table_agents);
+        let services: Vec<JoinHandle<()>> = self
+            .services
+            .iter()
+            .map(|(sid, service)| {
+                info!("Starting Service with ID: {}", sid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match service.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Service with ID: {}.", sid),
+                    }
 
-        nuclei::block_on(join_all(agents));
+                    service.after_start().await;
+                })
+            })
+            .collect();
+
+        workers.extend(agents);
+        workers.extend(table_agents);
+        workers.extend(services);
+
+        nuclei::block_on(join_all(workers));
     }
 }
