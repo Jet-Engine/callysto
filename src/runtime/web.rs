@@ -89,7 +89,7 @@ impl<State> Service<State> for Web<State>
             );
 
             'fallback: loop {
-                info!("Launched Recovery Service worker.");
+                info!("Launched Web Service worker.");
                 self.service_state()
                     .await
                     .replace_with(|e| ServiceState::Running);
