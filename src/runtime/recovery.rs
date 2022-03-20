@@ -138,7 +138,6 @@ where
         };
 
         Ok(closure.boxed())
-
     }
 
     async fn wait_until_stopped(&self) {

@@ -24,6 +24,7 @@ use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
 use crate::runtime::recovery::RecoveryService;
+use crate::runtime::web::Web;
 use crate::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
@@ -345,6 +346,13 @@ where
             self.state.clone(),
             self.tables.clone(),
             self.tables.values().map(|e| e as Arc<dyn Service<State>>).collect::<Vec<_>>()
+        ));
+
+        // Add Web Service
+        self.service(Web::new(
+            self.app_name.clone(),
+            self.state.clone(),
+            vec![]
         ));
 
         Ok(())
