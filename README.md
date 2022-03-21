@@ -35,7 +35,7 @@ Mind that `nerdctl` command is interchangeable with `docker`.
 
 ## With K8S
 1. You need to have K8S installation locally.
-2. ```shell
+```shell
 $ cd k8s && kubectl apply -f . && kubectl port-forward svc/redpanda 9092:9092
 ```
 
