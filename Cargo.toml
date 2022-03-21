@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
-nuclei = { version = "0.1.3", default-features = false, features = ["epoll", "asyncstd"] }
+nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
+#nuclei = { version = "0.1.3", default-features = false, features = ["epoll", "asyncstd"] }
 lightproc = "0.3.5"
 lever = "0.1.2"
 thiserror = "1.0"
