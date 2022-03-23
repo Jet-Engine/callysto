@@ -7,13 +7,13 @@ use crate::table::CTable;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
 use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
-use lever::prelude::LOTable;
 use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 
@@ -109,7 +109,6 @@ where
     F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Tables<State>, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
-
     async fn call(&self, st: Context<State>) -> Result<State> {
         Ok(self.state.clone())
     }
@@ -118,14 +117,20 @@ where
         let closure = async move {
             let consumer = self.topic.consumer();
 
-            info!("Assigning consumer contexts for source topic `{}` statistics", self.topic.topic_name());
+            info!(
+                "Assigning consumer contexts for source topic `{}` statistics",
+                self.topic.topic_name()
+            );
             // Assign consumer contexts to get the statistics data
             self.tables.iter().for_each(|(name, table)| {
                 table
                     .source_topic_consumer_context
                     .replace_with(|_| Some(consumer.consumer_context.clone()));
             });
-            info!("Assigned consumer contexts for source topic `{}` statistics", self.topic.topic_name());
+            info!(
+                "Assigned consumer contexts for source topic `{}` statistics",
+                self.topic.topic_name()
+            );
 
             for (table_name, table) in &self.tables {
                 table.start().await.unwrap().await;

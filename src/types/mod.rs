@@ -2,6 +2,7 @@ pub mod agent;
 pub mod collection;
 pub mod context;
 pub mod cronjob;
+pub mod route;
 pub mod service;
 pub mod table_agent;
 pub mod task;
@@ -14,4 +15,6 @@ pub mod prelude {
     pub use super::service::*;
     pub use super::table_agent::*;
     pub use super::task::*;
+
+    // Reexports
 }

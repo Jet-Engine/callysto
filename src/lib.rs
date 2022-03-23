@@ -17,12 +17,16 @@ pub mod types;
 mod runtime;
 mod stores;
 
+pub use http_types;
 pub use rdkafka;
 
 pub mod prelude {
     pub use super::app::*;
     pub use super::config::*;
     pub use super::errors::*;
+    pub use super::http_types::{
+        Request as CWebRequest, Response as CWebResponse, Result as CWebResult, *,
+    };
     pub use super::kafka::*;
     pub use super::rdkafka::*;
     pub use super::table::*;
