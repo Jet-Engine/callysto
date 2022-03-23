@@ -162,6 +162,8 @@ where
         debug!("Serving {}", req.url());
 
         let ctx = Context::new(self.state.clone());
+        // TODO (vcq): Ankur we might need to cache this thing or make a fast lookup here.
+        // This one is poor man's solution.
         let res = match self
             .routes
             .iter()
