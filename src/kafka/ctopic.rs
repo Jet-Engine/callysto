@@ -43,7 +43,7 @@ impl CTopic {
         Self {
             topic: topic.as_ref().to_owned(),
             client_config,
-            admin_client
+            admin_client,
         }
     }
 

@@ -12,8 +12,10 @@ use crate::types::context::Context;
 use crate::types::service::{Service, ServiceState};
 use crate::types::table_agent::TableAgent;
 use async_trait::async_trait;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use futures::future::BoxFuture;
 use futures::{FutureExt, SinkExt};
+use futures_timer::Delay;
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
@@ -21,11 +23,9 @@ use rdkafka::{ClientConfig, ClientContext, Message};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::time::Duration;
-use crossbeam_channel::{Receiver, Sender, unbounded};
-use futures_timer::Delay;
 use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 use url::Url;
@@ -189,7 +189,11 @@ where
                     ));
                 }
             }
-            _ => return Err(CallystoError::ConsumerNoStat("No stat has been received".into())),
+            _ => {
+                return Err(CallystoError::ConsumerNoStat(
+                    "No stat has been received".into(),
+                ))
+            }
         }
         info!("Source <> Changelog partitions are matching");
 
@@ -199,7 +203,7 @@ where
     async fn after_start_callback(&self) -> Result<()> {
         loop {
             match self.verify_source_topic_partitions() {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     error!("{:?}", e);
                     info!("Changelog topic hasn't been created. Creating...");
@@ -221,7 +225,8 @@ where
                                 .ok_or(CallystoError::NoTopic(
                                     source_topic_name,
                                     "Source topic is not found in metadata.".into(),
-                                )).unwrap();
+                                ))
+                                .unwrap();
                             let source_n = source_topic_meta.partitions.len() - 1;
 
                             self.changelog_topic
@@ -240,7 +245,10 @@ where
     }
 
     fn start_changelog_worker(&self) -> Result<()> {
-        info!("`{}` Changelog worker started!", self.changelog_topic_name());
+        info!(
+            "`{}` Changelog worker started!",
+            self.changelog_topic_name()
+        );
         let rx = self.changelog_rx.clone();
         let topic = self.changelog_topic.clone();
 
@@ -293,7 +301,8 @@ where
         serialized_key: Vec<u8>,
         serialized_value: Vec<u8>,
     ) -> Result<()> {
-        self.changelog_tx.send((partition, serialized_key, serialized_value));
+        self.changelog_tx
+            .send((partition, serialized_key, serialized_value));
         Ok(())
     }
 
@@ -434,7 +443,11 @@ where
     }
 
     async fn after_start(&self) -> Result<()> {
-        info!("After Start - Table `{}` - Changelog Topic `{}`", self.table_name, self.changelog_topic_name());
+        info!(
+            "After Start - Table `{}` - Changelog Topic `{}`",
+            self.table_name,
+            self.changelog_topic_name()
+        );
         self.after_start_callback().await;
         Ok(())
     }

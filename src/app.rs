@@ -8,6 +8,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use futures::future::join_all;
+use http_types::headers::ToHeaderValues;
+use http_types::Request;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
@@ -29,6 +31,7 @@ use crate::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
 use crate::types::cronjob::CronJob;
+use crate::types::route::{Route, Router};
 use crate::types::service::Service;
 use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
 use crate::types::task::Task;
@@ -53,6 +56,7 @@ where
     agents: LOTable<usize, Arc<dyn Agent<State>>>,
     tables: LOTable<String, Arc<CTable<State>>>,
     table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
+    routes: LOTable<String, Arc<dyn Router<State>>>,
 }
 
 impl Callysto<()> {
@@ -88,6 +92,7 @@ where
             agents: LOTable::default(),
             tables: LOTable::default(),
             table_agents: LOTable::default(),
+            routes: LOTable::default()
         }
     }
 
@@ -186,6 +191,18 @@ where
     {
         let cc = self.build_client_config();
         CTopic::new(topic, cc)
+    }
+
+    // TODO: page method to serve
+    pub fn page<T: AsRef<str>, F, Fut>(&self, at: T, route: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(http_types::Request, Context<State>) -> Fut,
+        Fut: Future<Output = http_types::Result<http_types::Response>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let route = Route::new(route, self.state.clone(), at.as_ref().to_string(), self.app_name.clone());
+        self.routes.insert(at.as_ref().to_string(), Arc::new(route));
+        self
     }
 
     fn build_client_config(&self) -> ClientConfig {
@@ -332,11 +349,11 @@ where
         )
         .expect("Table build failed.");
 
-        self.tables.insert(table_name.as_ref().into(), Arc::new(table.clone()));
+        self.tables
+            .insert(table_name.as_ref().into(), Arc::new(table.clone()));
         table
     }
 
-    // TODO: page method to serve
     // TODO: table_route method to give data based on page slug
 
     fn background_workers(&self) -> CResult<()> {
@@ -345,15 +362,14 @@ where
             self.app_name.clone(),
             self.state.clone(),
             self.tables.clone(),
-            self.tables.values().map(|e| e as Arc<dyn Service<State>>).collect::<Vec<_>>()
+            self.tables
+                .values()
+                .map(|e| e as Arc<dyn Service<State>>)
+                .collect::<Vec<_>>(),
         ));
 
         // Add Web Service
-        self.service(Web::new(
-            self.app_name.clone(),
-            self.state.clone(),
-            vec![]
-        ));
+        self.service(Web::new(self.app_name.clone(), self.state.clone(), vec![]));
 
         Ok(())
     }
@@ -367,12 +383,12 @@ where
         self.background_workers();
 
         let mut workers: Vec<JoinHandle<()>> = Vec::with_capacity(
-            self.agents.len() +
-                self.services.len() +
-                self.table_agents.len() +
-                self.cronjobs.len() +
-                self.tasks.len() +
-                self.timers.len()
+            self.agents.len()
+                + self.services.len()
+                + self.table_agents.len()
+                + self.cronjobs.len()
+                + self.tasks.len()
+                + self.timers.len(),
         );
 
         let mut agents: Vec<JoinHandle<()>> = self

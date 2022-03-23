@@ -78,8 +78,8 @@ impl<T> From<T> for Arc<T> {
 }
 
 impl<T> AsyncRead for Arc<T>
-    where
-            for<'a> &'a T: AsyncRead,
+where
+    for<'a> &'a T: AsyncRead,
 {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -99,8 +99,8 @@ impl<T> AsyncRead for Arc<T>
 }
 
 impl<T> AsyncWrite for Arc<T>
-    where
-            for<'a> &'a T: AsyncWrite,
+where
+    for<'a> &'a T: AsyncWrite,
 {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -128,8 +128,8 @@ impl<T> AsyncWrite for Arc<T>
 }
 
 impl<T> AsyncSeek for Arc<T>
-    where
-            for<'a> &'a T: AsyncSeek,
+where
+    for<'a> &'a T: AsyncSeek,
 {
     fn poll_seek(
         self: Pin<&mut Self>,
