@@ -1,6 +1,7 @@
 use super::async_con::Arc as AArc;
 use crate::errors::*;
 use crate::prelude::{Context, ServiceState};
+use crate::types::route::Router;
 use crate::types::service::Service;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -8,10 +9,11 @@ use futures::FutureExt;
 use http_types::{Request, Response, StatusCode};
 use nuclei::Handle;
 use std::future;
+use std::future::Future;
 use std::net::TcpListener;
+use std::process::Output;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-use crate::types::route::Router;
 
 pub struct Web<State>
 where
@@ -19,7 +21,7 @@ where
 {
     app_name: String,
     state: State,
-    routes: Vec<Arc<dyn Router<State>>>,
+    dispatcher: RouteDispatcher<State>,
     dependencies: Vec<Arc<dyn Service<State>>>,
 }
 
@@ -27,11 +29,16 @@ impl<State> Web<State>
 where
     State: Clone + Send + Sync + 'static,
 {
-    pub fn new(app_name: String, state: State, routes: Vec<Arc<dyn Router<State>>>, dependencies: Vec<Arc<dyn Service<State>>>) -> Self {
+    pub fn new(
+        app_name: String,
+        state: State,
+        routes: Vec<Arc<dyn Router<State>>>,
+        dependencies: Vec<Arc<dyn Service<State>>>,
+    ) -> Self {
         Self {
             app_name,
-            state,
-            routes,
+            state: state.clone(),
+            dispatcher: RouteDispatcher::new(state, routes),
             dependencies,
         }
     }
@@ -41,46 +48,23 @@ where
         // Format the full host address.
         let host = format!("http://{}", listener.get_ref().local_addr()?);
         info!("Listening on {}", host);
-        let routes = Arc::new(self.routes.clone());
-        let state = self.state.clone();
+
+        let dispatcher = Arc::new(self.dispatcher.clone());
         loop {
             // Accept the next connection.
             let (stream, _) = listener.accept().await?;
-            let routes = routes.clone();
-            let state = state.clone();
+
             // Spawn a background task serving this connection.
             let stream = AArc::new(stream);
+
+            // Share the dispatcher between threads.
+            let dispatcher = dispatcher.clone();
             nuclei::spawn(async move {
-                let routes = routes.clone();
-                let state = state.clone();
-                if let Err(err) = async_h1::accept(stream, |req| async move {
-                    let routes = routes.clone();
-                    let state = state.clone();
-                    Self::serve(routes, state, req).await
-                }).await {
+                if let Err(err) = async_h1::accept(stream, |req| dispatcher.serve(req)).await {
                     error!("Connection error: {:#?}", err);
                 }
             });
         }
-    }
-
-    /// Serves a request and returns a response.
-    async fn serve(routes: Arc<Vec<Arc<dyn Router<State>>>>, state: State, req: Request) -> http_types::Result<Response> {
-        debug!("Serving {}", req.url());
-
-        let res = match routes.iter().find(|e| e.get_slug() == req.url().path()) {
-            Some(route) => {
-                route.call(req, Context::new(state)).await?
-            },
-            _ => {
-                let mut res = Response::new(StatusCode::NotFound);
-                res.insert_header("Content-Type", "text/plain");
-                res.set_body("Callysto: Route not found.");
-                res
-            }
-        };
-
-        Ok(res)
     }
 }
 
@@ -153,5 +137,45 @@ where
 
     async fn shortlabel(&self) -> String {
         String::from("web")
+    }
+}
+
+#[derive(Clone)]
+struct RouteDispatcher<State>
+where
+    State: Clone + Send + Sync + 'static,
+{
+    state: State,
+    routes: Vec<Arc<dyn Router<State>>>,
+}
+
+impl<State> RouteDispatcher<State>
+where
+    State: Clone + Send + Sync + 'static,
+{
+    fn new(state: State, routes: Vec<Arc<dyn Router<State>>>) -> Self {
+        Self { state, routes }
+    }
+
+    /// Serves a request and returns a response.
+    async fn serve(&self, req: Request) -> http_types::Result<Response> {
+        debug!("Serving {}", req.url());
+
+        let ctx = Context::new(self.state.clone());
+        let res = match self
+            .routes
+            .iter()
+            .find(|e| e.get_slug() == req.url().path())
+        {
+            Some(route) => route.call(req, ctx).await?,
+            _ => {
+                let mut res = Response::new(StatusCode::NotFound);
+                res.insert_header("Content-Type", "text/plain");
+                res.set_body("Callysto: Route not found.");
+                res
+            }
+        };
+
+        Ok(res)
     }
 }

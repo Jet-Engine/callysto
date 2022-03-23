@@ -20,6 +20,7 @@ use tracing_subscriber::filter::FilterExt;
 
 ///
 /// Context passed to every closure of every module definition
+#[derive(Clone)]
 pub struct Context<State>
 where
     State: Clone + Send + Sync + 'static,

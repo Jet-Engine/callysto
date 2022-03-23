@@ -1,7 +1,7 @@
-use async_trait::async_trait;
 use super::context::Context;
-use std::future::Future;
+use async_trait::async_trait;
 use http_types::{Request, Response};
+use std::future::Future;
 
 pub struct Route<State, F, Fut>
 where
@@ -22,7 +22,12 @@ where
     Fut: Future<Output = http_types::Result<Response>> + Send + 'static,
 {
     pub fn new(clo: F, state: State, slug: String, app_name: String) -> Self {
-        Self { clo, slug, state, app_name }
+        Self {
+            clo,
+            slug,
+            state,
+            app_name,
+        }
     }
 }
 
@@ -42,6 +47,10 @@ where
     fn get_slug(&self) -> String {
         self.slug.clone()
     }
+
+    fn get_state(&self) -> State {
+        self.state.clone()
+    }
 }
 
 #[async_trait]
@@ -53,4 +62,6 @@ where
     async fn call(&self, request: Request, st: Context<State>) -> http_types::Result<Response>;
 
     fn get_slug(&self) -> String;
+
+    fn get_state(&self) -> State;
 }

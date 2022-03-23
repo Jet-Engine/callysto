@@ -92,7 +92,7 @@ where
             agents: LOTable::default(),
             tables: LOTable::default(),
             table_agents: LOTable::default(),
-            routes: LOTable::default()
+            routes: LOTable::default(),
         }
     }
 
@@ -200,7 +200,12 @@ where
         Fut: Future<Output = http_types::Result<http_types::Response>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        let route = Route::new(route, self.state.clone(), at.as_ref().to_string(), self.app_name.clone());
+        let route = Route::new(
+            route,
+            self.state.clone(),
+            at.as_ref().to_string(),
+            self.app_name.clone(),
+        );
         self.routes.insert(at.as_ref().to_string(), Arc::new(route));
         self
     }
@@ -369,7 +374,12 @@ where
         ));
 
         // Add Web Service
-        self.service(Web::new(self.app_name.clone(), self.state.clone(), vec![]));
+        self.service(Web::new(
+            self.app_name.clone(),
+            self.state.clone(),
+            self.routes.values().into_iter().collect(),
+            vec![],
+        ));
 
         Ok(())
     }
