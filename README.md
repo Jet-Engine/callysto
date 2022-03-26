@@ -1,4 +1,4 @@
-# Callysto
+![callysto](art/callysto_banner_2000x500.png)
 
 # Requirements
 Until we stabilize things we will use:
