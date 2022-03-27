@@ -11,7 +11,7 @@ struct SharedState {
 impl SharedState {
     fn new() -> Self {
         Self {
-            value: Arc::new(AtomicU32::new(0)),
+            value: Arc::new(AtomicU32::default()),
         }
     }
 }
@@ -24,7 +24,7 @@ async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> 
     });
 
     // Increment message counter and print it.
-    // Show how you can store a application state.
+    // Show how you can store an application state.
     let state = ctx.state();
     let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
     println!("Message count: `{}`", msgcount);

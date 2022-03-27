@@ -11,6 +11,8 @@ async fn durable_agent(
     msg.map(|m| {
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
         println!("Received payload: `{}`", strm);
+
+        // Update tables based on incoming message.
         let num = strm.parse::<usize>().unwrap();
         if num % 2 == 0 {
             let even_numbers = tables.get("even_numbers").unwrap();
