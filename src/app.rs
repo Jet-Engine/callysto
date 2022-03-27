@@ -122,11 +122,7 @@ where
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        let task = CTask::new(
-            clo,
-            self.app_name.clone(),
-            self.state.clone()
-        );
+        let task = CTask::new(clo, self.app_name.clone(), self.state.clone());
         self.tasks.insert(stub, Arc::new(task));
         self
     }

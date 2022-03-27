@@ -25,7 +25,7 @@ pub mod prelude {
     pub use super::config::*;
     pub use super::errors::*;
     pub use super::http_types::{
-        Request as CWebRequest, Response as CWebResponse, Result as CWebResult
+        Request as CWebRequest, Response as CWebResponse, Result as CWebResult,
     };
     pub use super::kafka::*;
     pub use super::rdkafka::*;

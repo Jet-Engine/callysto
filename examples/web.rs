@@ -1,3 +1,4 @@
+use callysto::http_types::StatusCode;
 use callysto::prelude::*;
 
 async fn cpuinfo(req: CWebRequest, ctx: Context<()>) -> CWebResult<CWebResponse> {

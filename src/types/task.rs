@@ -36,11 +36,7 @@ where
     F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
-    pub fn new(
-        clo: F,
-        app_name: String,
-        state: State,
-    ) -> Self {
+    pub fn new(clo: F, app_name: String, state: State) -> Self {
         Self {
             clo,
             app_name,
@@ -78,10 +74,7 @@ where
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let state = self.state.clone();
         let closure = async move {
-            info!(
-                "Started CTask - App `{}`",
-                self.app_name.clone()
-            );
+            info!("Started CTask - App `{}`", self.app_name.clone());
 
             let context = Context::new(state);
             match Task::<State>::call(self, context).await {

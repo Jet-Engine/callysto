@@ -7,7 +7,7 @@ use crate::types::collection::Collection;
 use crate::types::service::Service;
 use async_trait::async_trait;
 use futures::future::{join_all, BoxFuture};
-use futures::FutureExt;
+use futures::{pin_mut, FutureExt};
 use futures::{SinkExt, StreamExt};
 use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
@@ -140,7 +140,8 @@ where
                     }
                     match self.consume_changelogs().await {
                         Ok(tasks) => {
-                            join_all(tasks).await;
+                            let fut = join_all(tasks);
+                            nuclei::spawn_blocking(move || nuclei::block_on(fut)).await;
                         }
                         Err(e) => {
                             error!("Changelog Service failed: {:?}", e);
