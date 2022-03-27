@@ -183,8 +183,6 @@ where
         self
     }
 
-    // You have searched for "Mutex", "CondVar" or "RwLock". You won't find them.
-
     pub fn topic<T>(&self, topic: T) -> CTopic
     where
         T: AsRef<str>,
