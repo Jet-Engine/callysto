@@ -38,6 +38,11 @@ use crate::types::task::Task;
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
+///
+/// Struct that will help architecting your application.
+///
+/// This contains application's runner in addition to the function modules that will design
+/// your application.
 pub struct Callysto<State>
 where
     State: Clone + Send + Sync + 'static,
@@ -60,7 +65,20 @@ where
 }
 
 impl Callysto<()> {
-    #[must_use]
+    ///
+    /// Creates an application without shared state between it's modules.
+    ///
+    /// Modules are going to use `()` as state which gets optimized away.
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// fn main() {
+    ///     let mut app = Callysto::new();
+    ///     app.with_name("example-app");
+    /// }
+    /// ```
     pub fn new() -> Self {
         Self::with_state(())
     }
@@ -76,6 +94,30 @@ impl<State> Callysto<State>
 where
     State: Clone + Send + Sync + 'static,
 {
+    ///
+    /// Create application with given `State`.
+    ///
+    /// This state will be shared in whole application's scope. It's instance specific and other
+    /// workers that ran separately will not see this shared state. In other words, this state is not distributed.
+    ///
+    /// This state will be injected via [Context] to modules.
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// // Shared State
+    /// #[derive(Clone)]
+    /// struct State {
+    ///    name: String,
+    /// }
+    ///
+    /// fn main() {
+    ///     let state = State { name: "Callysto".into() };
+    ///     let mut app = Callysto::with_state(state);
+    ///     app.with_name("stateful-app");
+    /// }
+    /// ```
     pub fn with_state(state: State) -> Self {
         Self {
             app_name: "callysto-app".to_owned(),
@@ -96,6 +138,34 @@ where
         }
     }
 
+    ///
+    /// Durable/Non durable storage to run your application with.
+    /// This storage will be used for all storage needs that application requires.
+    /// Given storage driver will be used for all distributed tables of this application instance.
+    /// You application workers can use different driver backends across your deployment.
+    /// e.g. instance 1 can use rocksdb backend, but your instance 2 can use aerospike.
+    /// Driver's are detached from your application code in that regard.
+    ///
+    /// Storage backends can be enabled with feature flag.
+    /// At the moment you can't use more than one storage backend for the same instance.
+    /// But this will be possible in future.
+    ///
+    /// ### Example storage url schemes are:
+    /// 1. `rocksdb:///home/callysto/datadir`
+    /// 2. `aerospike:///home/callysto/datadir`
+    /// 3. `inmemory:///home/callysto/datadir`
+    ///
+    /// Mind that `inmemory` backend doesn't supply full durability across crashes or instance restarts.
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// fn main() {
+    ///     let mut app = Callysto::new();
+    ///     app.with_storage("rocksdb:///home/callysto/datadir");
+    /// }
+    /// ```
     pub fn with_storage<T>(&mut self, url: T) -> &mut Self
     where
         T: AsRef<str>,
@@ -105,23 +175,63 @@ where
         self
     }
 
+    ///
+    /// By default `callysto-app` is used internally as application name.
+    /// If you want to change this you can use this method.
+    /// This method will change also consumer group names and changelog topic names.
+    /// Changing this will create different changelog topics for your tables.
+    /// Previous changelog topics won't be cleaned.
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// fn main() {
+    ///     let mut app = Callysto::new();
+    ///     app.with_name("amazing-service-of-mine");
+    /// }
+    /// ```
     pub fn with_name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
         self.app_name = name.as_ref().to_string();
         self
     }
 
+    ///
+    /// Kafka brokers to connect to.
+    /// By default application will connect to `localhost:9092`.
+    ///
+    /// For multiple brokers, please use comma separated broker list.
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// fn main() {
+    ///     let mut app = Callysto::new();
+    ///     app.with_brokers("kafka1:9092,kafka2:9092,kafka3:9092");
+    /// }
+    /// ```
     pub fn with_brokers<T: AsRef<str>>(&mut self, brokers: T) -> &mut Self {
         self.brokers = brokers.as_ref().to_string();
         self
     }
 
+    ///
+    /// Callysto apps composed of modules. Task is one of these modules.
+    /// Task is used for one-off tasks that will start when your application starts.
+    ///
+    /// As soon as your application worker is running, tasks will fire.
+    /// If you want to do something at periodic intervals, use [Timer](Callysto::timer).
     pub fn task(&self, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.tasks.insert(stub, Arc::new(t));
         self
     }
 
-    pub fn timer(&self, t: impl Task<State>) -> &Self {
+    ///
+    /// A timer is a task that executes in every given interval.
+    /// After application worker is ready, timer will start working and execute the given task periodically.
+    pub fn timer(&self, interval: f64, t: impl Task<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.timers.insert(stub, Arc::new(t));
         self

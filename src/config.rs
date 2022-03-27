@@ -39,7 +39,7 @@ pub struct Config {
 
     ///
     /// The maximum allowed time (in milliseconds) between calls to consume messages
-    /// If the consumer crashes or is unable to send heartbeats for a duration of `session.timeout.ms` (in Callysto it is [session_timeout_ms]),
+    /// If the consumer crashes or is unable to send heartbeats for a duration of `session.timeout.ms` (in Callysto it is `session_timeout_ms`),
     /// then the consumer will be considered dead and its partitions will be reassigned.
     pub max_poll_interval_ms: usize,
 

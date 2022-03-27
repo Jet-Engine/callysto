@@ -9,9 +9,10 @@ authors = [
 keywords = ["stream", "stream-processing", "microservice", "distributed", "database"]
 categories = ["concurrency", "asynchronous", "database", "database-implementations"]
 edition = "2021"
+rust-version = "1.61"
 license = "Apache-2.0"
 readme = "README.md"
-homepage = "https://github.com/vertexclique/callysto"
+homepage = "https://vertexclique.github.io/callysto/"
 repository = "https://github.com/vertexclique/callysto"
 exclude = [
     ".github/*",
@@ -57,3 +58,7 @@ async-h1 = "2.3"
 
 # Optionals
 rocksdb = { version = "0.18", optional = true }
+
+[profile.release]
+codegen-units = 1
+lto = true
