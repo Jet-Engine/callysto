@@ -10,7 +10,6 @@ fn main() {
     let mut limit = std::mem::MaybeUninit::<libc::rlimit>::uninit();
     let ret = unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, limit.as_mut_ptr()) };
     if ret != 0 {
-        // println!("RLIMIT_NOFILE Err: {}", std::io::Error::last_os_error());
         panic!("RLIMIT_NOFILE Err: {}", std::io::Error::last_os_error());
     }
     let limit = unsafe { limit.assume_init() };
