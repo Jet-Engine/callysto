@@ -25,6 +25,7 @@ use url::Url;
 use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
+use crate::prelude::CTask;
 use crate::runtime::recovery::RecoveryService;
 use crate::runtime::web::Web;
 use crate::table::CTable;
@@ -115,9 +116,18 @@ where
         self
     }
 
-    pub fn task(&self, t: impl Task<State>) -> &Self {
+    pub fn task<F, Fut>(&self, clo: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.tasks.insert(stub, Arc::new(t));
+        let task = CTask::new(
+            clo,
+            self.app_name.clone(),
+            self.state.clone()
+        );
+        self.tasks.insert(stub, Arc::new(task));
         self
     }
 
@@ -446,6 +456,21 @@ where
                     }
 
                     service.after_start().await;
+                })
+            })
+            .collect();
+
+        let tasks: Vec<JoinHandle<()>> = self
+            .tasks
+            .iter()
+            .map(|(tid, task)| {
+                info!("Starting Task with ID: {}", tid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match task.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Task with ID: {}.", tid),
+                    }
                 })
             })
             .collect();

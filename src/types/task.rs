@@ -12,12 +12,42 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{error, info};
 use tracing_subscriber::filter::FilterExt;
 
 ///////////////////////////////////////////////////
 //////// CTask
 ///////////////////////////////////////////////////
+
+pub struct CTask<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    clo: F,
+    app_name: String,
+    state: State,
+}
+
+impl<State, F, Fut> CTask<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    pub fn new(
+        clo: F,
+        app_name: String,
+        state: State,
+    ) -> Self {
+        Self {
+            clo,
+            app_name,
+            state,
+        }
+    }
+}
 
 #[async_trait]
 pub trait Task<State>: Send + Sync + 'static
@@ -25,19 +55,43 @@ where
     State: Clone + Send + Sync + 'static,
 {
     /// Execute the given task with state passed in
-    async fn call(&self, st: Context<State>) -> CResult<State>;
+    async fn call(&self, st: Context<State>) -> CResult<()>;
+
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        unimplemented!()
+    }
 }
 
-// #[async_trait]
-// impl<State, F, Fut> Task<State> for F
-// where
-//     State: Clone + Send + Sync + 'static,
-//     F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
-//     Fut: Future<Output = CResult<State>> + Send + 'static,
-// {
-//     async fn call(&self, req: Context<State>) -> CResult<State> {
-//         let fut = (self)(req);
-//         let res = fut.await?;
-//         Ok(res.into())
-//     }
-// }
+#[async_trait]
+impl<State, F, Fut> Task<State> for CTask<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<()>> + Send + 'static,
+{
+    async fn call(&self, req: Context<State>) -> CResult<()> {
+        let fut = (self.clo)(req);
+        let res = fut.await?;
+        Ok(res.into())
+    }
+
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        let state = self.state.clone();
+        let closure = async move {
+            info!(
+                "Started CTask - App `{}`",
+                self.app_name.clone()
+            );
+
+            let context = Context::new(state);
+            match Task::<State>::call(self, context).await {
+                Err(e) => {
+                    error!("CTask failed: {}", e);
+                }
+                _ => {}
+            }
+        };
+
+        Ok(closure.boxed())
+    }
+}
