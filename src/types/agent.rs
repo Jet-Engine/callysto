@@ -2,7 +2,7 @@ use super::context::Context;
 use crate::errors::Result as CResult;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use crate::types::service::{Service, ServiceState};
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};

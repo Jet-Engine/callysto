@@ -5,7 +5,7 @@ use crate::errors::*;
 use crate::errors::*;
 use crate::kafka::ctopic::*;
 use crate::kafka::ctopic::*;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use async_trait::*;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};

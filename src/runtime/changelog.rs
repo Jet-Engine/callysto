@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::kafka::ctopic::CTP;
 use crate::prelude::{Collection, Context, Service, ServiceState};
 use crate::stores::store::Store;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::FutureExt;
