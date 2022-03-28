@@ -25,7 +25,7 @@ use url::Url;
 use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
-use crate::prelude::CTask;
+use crate::prelude::{CTask, CTimer};
 use crate::runtime::recovery::RecoveryService;
 use crate::runtime::web::Web;
 use crate::table::CTable;
@@ -237,9 +237,19 @@ where
     ///
     /// A timer is a task that executes in every given interval.
     /// After application worker is ready, timer will start working and execute the given task periodically.
-    pub fn timer(&self, interval: f64, t: impl Task<State>) -> &Self {
+    pub fn timer<F, Fut>(&self, interval_seconds: f64, clo: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.timers.insert(stub, Arc::new(t));
+        let task = CTimer::new(
+            clo,
+            self.app_name.clone(),
+            interval_seconds,
+            self.state.clone(),
+        );
+        self.timers.insert(stub, Arc::new(task));
         self
     }
 
@@ -580,17 +590,39 @@ where
 
         let task_handles = join_all(tasks);
 
-        let agent_poller =
-            nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+        let timers: Vec<JoinHandle<()>> = self
+            .timers
+            .iter()
+            .map(|(tid, timer)| {
+                info!("Starting Timer with ID: {}", tid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match timer.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Task with ID: {}.", tid),
+                    }
+                })
+            })
+            .collect();
+
+        let timer_handles = join_all(timers);
+
+        let agent_poller = nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
         let table_agent_poller =
             nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
-        let service_poller =
-            nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
-        let task_poller =
-            nuclei::spawn_blocking(move || nuclei::block_on(task_handles));
+        let service_poller = nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
+        let task_poller = nuclei::spawn_blocking(move || nuclei::block_on(task_handles));
+        let timer_poller = nuclei::spawn_blocking(move || nuclei::block_on(timer_handles));
 
         nuclei::block_on(async move {
-            join_all(vec![agent_poller, table_agent_poller, service_poller, task_poller]).await
+            join_all(vec![
+                agent_poller,
+                table_agent_poller,
+                service_poller,
+                task_poller,
+                timer_poller,
+            ])
+            .await
         });
     }
 }

@@ -1,5 +1,5 @@
-use callysto::prelude::*;
 use callysto::http_types::StatusCode;
+use callysto::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
