@@ -592,7 +592,5 @@ where
         nuclei::block_on(async move {
             join_all(vec![agent_poller, table_agent_poller, service_poller, task_poller]).await
         });
-        //
-        // nuclei::block_on(join_all(workers));
     }
 }
