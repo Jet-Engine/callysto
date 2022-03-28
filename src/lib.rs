@@ -23,8 +23,8 @@
     html_logo_url = "https://raw.githubusercontent.com/vertexclique/callysto/master/art/callysto_logo.png"
 )]
 // Force missing implementations
-#![warn(missing_docs)]
-#![warn(missing_debug_implementations)]
+// #![warn(missing_docs)]
+// #![warn(missing_debug_implementations)]
 // Doc generation experimental features
 #![cfg_attr(feature = "docs", feature(doc_cfg))]
 
@@ -69,7 +69,7 @@ pub mod prelude {
     pub use super::config::*;
     pub use super::errors::*;
     pub use super::http_types::{
-        Request as CWebRequest, Response as CWebResponse, Result as CWebResult, *,
+        Request as CWebRequest, Response as CWebResponse, Result as CWebResult,
     };
     pub use super::kafka::*;
     pub use super::rdkafka::*;

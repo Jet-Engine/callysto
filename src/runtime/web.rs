@@ -6,6 +6,7 @@ use crate::types::service::Service;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures_timer::Delay;
 use http_types::{Request, Response, StatusCode};
 use nuclei::Handle;
 use std::future;
@@ -79,7 +80,11 @@ where
 
     async fn start(&self) -> crate::errors::Result<BoxFuture<'_, ()>> {
         let closure = async move {
-            nuclei::spawn_blocking(|| nuclei::drive(future::pending::<()>()));
+            nuclei::spawn_blocking(|| {
+                nuclei::drive(async {
+                    Delay::new(std::time::Duration::from_millis(10)).await;
+                })
+            });
 
             for x in &self.dependencies {
                 info!("WebServer - {} - Dependencies are starting", self.app_name);

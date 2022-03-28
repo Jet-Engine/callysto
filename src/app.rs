@@ -25,6 +25,7 @@ use url::Url;
 use crate::config::Config;
 use crate::errors::Result as CResult;
 use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
+use crate::prelude::CTask;
 use crate::runtime::recovery::RecoveryService;
 use crate::runtime::web::Web;
 use crate::table::CTable;
@@ -222,9 +223,14 @@ where
     ///
     /// As soon as your application worker is running, tasks will fire.
     /// If you want to do something at periodic intervals, use [Timer](Callysto::timer).
-    pub fn task(&self, t: impl Task<State>) -> &Self {
+    pub fn task<F, Fut>(&self, clo: F) -> &Self
+    where
+        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+        Fut: Future<Output = CResult<()>> + Send + 'static,
+    {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
-        self.tasks.insert(stub, Arc::new(t));
+        let task = CTask::new(clo, self.app_name.clone(), self.state.clone());
+        self.tasks.insert(stub, Arc::new(task));
         self
     }
 
@@ -500,15 +506,6 @@ where
         // Load all background workers
         self.background_workers();
 
-        let mut workers: Vec<JoinHandle<()>> = Vec::with_capacity(
-            self.agents.len()
-                + self.services.len()
-                + self.table_agents.len()
-                + self.cronjobs.len()
-                + self.tasks.len()
-                + self.timers.len(),
-        );
-
         let mut agents: Vec<JoinHandle<()>> = self
             .agents
             .iter()
@@ -525,6 +522,8 @@ where
                 })
             })
             .collect();
+
+        let agent_handles = join_all(agents);
 
         let table_agents: Vec<JoinHandle<()>> = self
             .table_agents
@@ -543,6 +542,8 @@ where
             })
             .collect();
 
+        let table_agent_handles = join_all(table_agents);
+
         let services: Vec<JoinHandle<()>> = self
             .services
             .iter()
@@ -560,10 +561,38 @@ where
             })
             .collect();
 
-        workers.extend(agents);
-        workers.extend(table_agents);
-        workers.extend(services);
+        let service_handles = join_all(services);
 
-        nuclei::block_on(join_all(workers));
+        let tasks: Vec<JoinHandle<()>> = self
+            .tasks
+            .iter()
+            .map(|(tid, task)| {
+                info!("Starting Task with ID: {}", tid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match task.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Task with ID: {}.", tid),
+                    }
+                })
+            })
+            .collect();
+
+        let task_handles = join_all(tasks);
+
+        let agent_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+        let table_agent_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
+        let service_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
+        let task_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(task_handles));
+
+        nuclei::block_on(async move {
+            join_all(vec![agent_poller, table_agent_poller, service_poller, task_poller]).await
+        });
+        //
+        // nuclei::block_on(join_all(workers));
     }
 }

@@ -36,8 +36,8 @@ default = ["store-rocksdb"]
 store-rocksdb = ["rocksdb"]
 
 [dependencies]
-nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
-#nuclei = { version = "0.1.3", default-features = false, features = ["epoll", "asyncstd"] }
+#nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
+nuclei = { version = "0.1.3", default-features = false, features = ["epoll", "asyncstd"] }
 lightproc = "0.3.5"
 lever = "0.1.2"
 thiserror = "1.0"
@@ -58,7 +58,3 @@ async-h1 = "2.3"
 
 # Optionals
 rocksdb = { version = "0.18", optional = true }
-
-[profile.release]
-codegen-units = 1
-lto = true
