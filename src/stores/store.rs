@@ -1,6 +1,6 @@
 use crate::errors::*;
 use crate::kafka::ctopic::CTP;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use crate::types::service::Service;
 use async_trait::*;
 use rdkafka::message::OwnedMessage;

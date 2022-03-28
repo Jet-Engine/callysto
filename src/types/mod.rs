@@ -7,6 +7,8 @@ pub mod service;
 pub mod table_agent;
 pub mod task;
 pub mod timer;
+/// Table definition
+pub mod table;
 
 pub mod prelude {
     pub use super::agent::*;

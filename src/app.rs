@@ -28,7 +28,7 @@ use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
 use crate::prelude::{CTask, CTimer};
 use crate::runtime::recovery::RecoveryService;
 use crate::runtime::web::Web;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
 use crate::types::cronjob::CronJob;
@@ -317,7 +317,6 @@ where
         CTopic::new(topic, cc)
     }
 
-    // TODO: page method to serve
     pub fn page<T: AsRef<str>, F, Fut>(&self, at: T, route: F) -> &Self
     where
         F: Send + Sync + 'static + Fn(http_types::Request, Context<State>) -> Fut,

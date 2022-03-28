@@ -2,7 +2,7 @@ use crate::errors::*;
 use crate::kafka::cconsumer::CConsumer;
 use crate::prelude::{Context, ServiceState, Tables};
 use crate::stores::store::Store;
-use crate::table::CTable;
+use crate::types::table::CTable;
 use crate::types::collection::Collection;
 use crate::types::service::Service;
 use async_trait::async_trait;

@@ -4,7 +4,7 @@ RUN apt-get update -y && \
     apt install upx cmake libssl-dev libsasl2-dev wget \
     clang -y
 
-ADD . /opt/src
+ADD .. /opt/src
 WORKDIR /opt/src
 RUN cargo build --release --examples && \
     ls -al /opt/src/target/release && \

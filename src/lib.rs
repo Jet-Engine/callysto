@@ -50,8 +50,6 @@ pub mod errors;
 pub mod kafka;
 /// Metric implementations to instrument Callysto application
 pub mod sensors;
-/// Table definition
-pub mod table;
 /// Callysto's building blocks. All modules are under types.
 pub mod types;
 
@@ -73,6 +71,6 @@ pub mod prelude {
     };
     pub use super::kafka::*;
     pub use super::rdkafka::*;
-    pub use super::table::*;
+    pub use crate::types::table::*;
     pub use crate::types::prelude::*;
 }

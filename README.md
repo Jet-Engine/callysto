@@ -1,12 +1,9 @@
 ![callysto](art/callysto_banner_2000x500.png)
 
-# Requirements
-Until we stabilize things we will use:
-* LLVM 13
-* CLang as CC
-* gold as linker
 
-By changing the default `.cargo/config` you can pass use `ld` or `lld` without any problem.
+### Requirements
+* cmake
+* clang
 
 # Rust MSRV
 We are using:
