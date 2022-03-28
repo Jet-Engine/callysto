@@ -28,12 +28,12 @@ use crate::kafka::{ctopic::*, runtime::NucleiRuntime};
 use crate::prelude::{CTask, CTimer};
 use crate::runtime::recovery::RecoveryService;
 use crate::runtime::web::Web;
-use crate::types::table::CTable;
 use crate::types::agent::{Agent, CAgent};
 use crate::types::context::*;
 use crate::types::cronjob::CronJob;
 use crate::types::route::{Route, Router};
 use crate::types::service::Service;
+use crate::types::table::CTable;
 use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
 use crate::types::task::Task;
 

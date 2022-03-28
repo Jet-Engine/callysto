@@ -5,6 +5,7 @@ use crate::kafka::cconsumer::CConsumer;
 use crate::kafka::contexts::{CConsumerContext, CStatistics};
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
+use crate::stores::inmemory::InMemoryStore;
 use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
 use crate::types::collection::Collection;
@@ -129,12 +130,15 @@ where
         table_name: String,
     ) -> Result<Arc<dyn Store<State>>> {
         match storage_url.scheme().to_lowercase().as_str() {
+            "inmemory" => {
+                let db = InMemoryStore::new(app_name, storage_url, table_name);
+                Ok(Arc::new(db))
+            }
             "rocksdb" | "rocks" => {
                 let rdb = RocksDbStore::new(app_name, storage_url, table_name);
                 Ok(Arc::new(rdb))
             }
             "aerospikedb" | "aerospike" => todo!(),
-            "inmemory" => todo!(),
             storage_backend => Err(CallystoError::GeneralError(format!(
                 "Unknown storage backend: {}",
                 storage_backend

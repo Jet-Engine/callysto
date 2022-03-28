@@ -4,11 +4,11 @@ pub mod context;
 pub mod cronjob;
 pub mod route;
 pub mod service;
+/// Table definition
+pub mod table;
 pub mod table_agent;
 pub mod task;
 pub mod timer;
-/// Table definition
-pub mod table;
 
 pub mod prelude {
     pub use super::agent::*;

@@ -391,7 +391,7 @@ where
     fn set_persisted_offset(&self, tp: CTP, offset: usize) -> Result<()> {
         Ok(self
             .db_for_partition(tp.partition)?
-            .put(CALLYSTO_OFFSET_KEY, offset.to_string())?)
+            .put(CALLYSTO_OFFSET_KEY, offset.to_ne_bytes())?)
     }
 
     fn apply_changelog_batch(&self, events: Vec<OwnedMessage>) -> Result<()> {
@@ -466,6 +466,7 @@ where
         newly_assigned: Vec<CTP>,
         generation_id: usize,
     ) -> Result<()> {
+        // TODO: On Rebalance
         self.rebalance_ack.store(false, Ordering::SeqCst);
         if let Some(_lock) = self.db_lock.try_lock() {
             //             self.revoke_partitions(self.table, revoked)

@@ -32,7 +32,11 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["store-rocksdb"]
+default = [
+    "store-rocksdb",
+    "sink-elastic"
+]
+sink-elastic = ["elasticsearch"]
 store-rocksdb = ["rocksdb"]
 
 [dependencies]
@@ -58,3 +62,4 @@ async-h1 = "2.3"
 
 # Optionals
 rocksdb = { version = "0.18", optional = true }
+elasticsearch = { version = "7.14.0-alpha.1", optional = true }
