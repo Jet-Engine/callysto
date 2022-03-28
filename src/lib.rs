@@ -71,6 +71,6 @@ pub mod prelude {
     };
     pub use super::kafka::*;
     pub use super::rdkafka::*;
-    pub use crate::types::table::*;
     pub use crate::types::prelude::*;
+    pub use crate::types::table::*;
 }
