@@ -506,15 +506,6 @@ where
         // Load all background workers
         self.background_workers();
 
-        let mut workers: Vec<JoinHandle<()>> = Vec::with_capacity(
-            self.agents.len()
-                + self.services.len()
-                + self.table_agents.len()
-                + self.cronjobs.len()
-                + self.tasks.len()
-                + self.timers.len(),
-        );
-
         let mut agents: Vec<JoinHandle<()>> = self
             .agents
             .iter()
@@ -531,6 +522,8 @@ where
                 })
             })
             .collect();
+
+        let agent_handles = join_all(agents);
 
         let table_agents: Vec<JoinHandle<()>> = self
             .table_agents
@@ -549,6 +542,8 @@ where
             })
             .collect();
 
+        let table_agent_handles = join_all(table_agents);
+
         let services: Vec<JoinHandle<()>> = self
             .services
             .iter()
@@ -566,6 +561,8 @@ where
             })
             .collect();
 
+        let service_handles = join_all(services);
+
         let tasks: Vec<JoinHandle<()>> = self
             .tasks
             .iter()
@@ -581,10 +578,21 @@ where
             })
             .collect();
 
-        workers.extend(agents);
-        workers.extend(table_agents);
-        workers.extend(services);
+        let task_handles = join_all(tasks);
 
-        nuclei::block_on(join_all(workers));
+        let agent_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+        let table_agent_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
+        let service_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
+        let task_poller =
+            nuclei::spawn_blocking(move || nuclei::block_on(task_handles));
+
+        nuclei::block_on(async move {
+            join_all(vec![agent_poller, table_agent_poller, service_poller, task_poller]).await
+        });
+        //
+        // nuclei::block_on(join_all(workers));
     }
 }
