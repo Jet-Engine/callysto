@@ -6,6 +6,7 @@ pub mod route;
 pub mod service;
 pub mod table_agent;
 pub mod task;
+pub mod timer;
 
 pub mod prelude {
     pub use super::agent::*;
@@ -15,6 +16,7 @@ pub mod prelude {
     pub use super::service::*;
     pub use super::table_agent::*;
     pub use super::task::*;
+    pub use super::timer::*;
 
     // Reexports
 }
