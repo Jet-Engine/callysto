@@ -1,5 +1,5 @@
-use callysto::http_types::StatusCode;
 use callysto::prelude::*;
+use callysto::http_types::StatusCode;
 
 async fn cpuinfo(req: CWebRequest, ctx: Context<()>) -> CWebResult<CWebResponse> {
     let mut res = CWebResponse::new(StatusCode::Ok);
