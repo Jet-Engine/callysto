@@ -485,24 +485,28 @@ where
     // TODO: table_route method to give data based on page slug
 
     fn background_workers(&self) -> CResult<()> {
-        // Add Recovery Service
-        self.service(RecoveryService::new(
-            self.app_name.clone(),
-            self.state.clone(),
-            self.tables.clone(),
-            self.tables
-                .values()
-                .map(|e| e as Arc<dyn Service<State>>)
-                .collect::<Vec<_>>(),
-        ));
+        // Recovery Service launch procedure
+        if self.tables.len() > 0 {
+            self.service(RecoveryService::new(
+                self.app_name.clone(),
+                self.state.clone(),
+                self.tables.clone(),
+                self.tables
+                    .values()
+                    .map(|e| e as Arc<dyn Service<State>>)
+                    .collect::<Vec<_>>(),
+            ));
+        }
 
-        // Add Web Service
-        self.service(Web::new(
-            self.app_name.clone(),
-            self.state.clone(),
-            self.routes.values().into_iter().collect(),
-            vec![],
-        ));
+        // Web Service launch procedure
+        if self.routes.len() > 0 {
+            self.service(Web::new(
+                self.app_name.clone(),
+                self.state.clone(),
+                self.routes.values().into_iter().collect(),
+                vec![],
+            ));
+        }
 
         Ok(())
     }

@@ -34,7 +34,7 @@ exclude = [
 [features]
 default = [
     "store-rocksdb",
-    "sink-elastic"
+#    "sink-elastic"
 ]
 sink-elastic = ["elasticsearch"]
 store-rocksdb = ["rocksdb"]
