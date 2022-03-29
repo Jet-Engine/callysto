@@ -5,15 +5,15 @@
 * cmake
 * clang
 
-# Rust MSRV
+### Rust MSRV
 We are using:
 ```
 nightly-x86_64-unknown-linux-gnu (default)
 rustc 1.61.0-nightly (1eb72580d 2022-03-08)
 ```
 
-# Running
-## With Docker Compose - Nerdctl Compose 
+### Running
+#### With Docker Compose - Nerdctl Compose 
 1. You need to have docker installation locally.
 With containerd backend, if you want to bring single node Kafka replacement use:
 ```shell
@@ -30,7 +30,7 @@ $ nerdctl compose -f docker-compose.kafkacluster.yml
 
 Mind that `nerdctl` command is interchangeable with `docker`.
 
-## With K8S
+#### With K8S
 1. You need to have K8S installation locally.
 ```shell
 $ cd k8s && kubectl apply -f . && kubectl port-forward svc/redpanda 9092:9092
