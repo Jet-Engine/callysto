@@ -75,15 +75,15 @@ where
                         changelog_topic_name
                     );
                     let mut element_count = 0_usize;
-                    let mut message_stream = consumer.stream().ready_chunks(10);
+                    let mut message_stream = consumer.cstream().ready_chunks(10);
                     while let Some(messages) = message_stream.next().await {
                         info!("Recovery received `{}` changelog objects.", messages.len());
                         let msgs: Vec<OwnedMessage> = messages
                             .iter()
                             .flat_map(|rm| match rm {
-                                Ok(bm) => Some(bm.detach()),
-                                Err(e) => {
-                                    error!("{}", e);
+                                Some(bm) => Some(bm.to_owned()),
+                                _ => {
+                                    error!("Empty message received on recovery!");
                                     None
                                 }
                             })

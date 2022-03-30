@@ -11,7 +11,9 @@ use futures::stream::StreamExt;
 use futures_timer::Delay;
 use lever::sync::atomics::AtomicBox;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication, TopicResult};
-use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
+use rdkafka::consumer::{
+    BaseConsumer, Consumer, DefaultConsumerContext, MessageStream, StreamConsumer,
+};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
 use rdkafka::util::AsyncRuntime;
@@ -53,15 +55,23 @@ impl CTopic {
 
     pub fn consumer(&self) -> CConsumer {
         let consumer_context = CConsumerContext::new(self.topic.clone());
-        let consumer: StreamConsumer<_, NucleiRuntime> = self
+        // let consumer: StreamConsumer<_, NucleiRuntime> = self
+        //     .client_config
+        //     .create_with_context(consumer_context.clone())
+        //     .expect("Consumer creation failed");
+        let consumer: BaseConsumer<_> = self
             .client_config
             .create_with_context(consumer_context.clone())
-            .expect("Consumer creation failed");
+            .expect("Consumer creation failed.");
         consumer.subscribe(&[&self.topic]).unwrap();
 
+        let (tx, rx) = crossbeam_channel::unbounded::<Option<OwnedMessage>>();
+
         CConsumer {
-            consumer,
+            consumer: Arc::new(consumer),
             consumer_context,
+            tx,
+            rx,
         }
     }
 
