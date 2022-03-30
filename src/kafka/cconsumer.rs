@@ -61,6 +61,8 @@ impl Stream for CStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         if let Ok(mut inner) = this.rx.recv() {
+            // XXX: Always return something, inner Kafka message or no message at all.
+            // You can unwrap on `Next` stream iterator.
             Poll::Ready(Some(inner))
         } else {
             Poll::Pending
