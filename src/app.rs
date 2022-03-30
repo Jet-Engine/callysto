@@ -37,6 +37,9 @@ use crate::types::table::CTable;
 use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
 use crate::types::task::Task;
 
+use crate::prelude::cconsumer::CStream;
+use futures::Stream;
+
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
 ///
@@ -255,7 +258,7 @@ where
 
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Context<State>) -> Fut,
+        F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
