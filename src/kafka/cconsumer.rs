@@ -53,8 +53,6 @@ pin_project! {
     }
 }
 
-unsafe impl Send for CStream {}
-
 impl Stream for CStream {
     type Item = Option<OwnedMessage>;
 
