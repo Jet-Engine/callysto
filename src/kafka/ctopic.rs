@@ -3,6 +3,7 @@ use std::future::Future;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
+use cuneiform_fields::arch::ArchPadding;
 
 use crate::errors::*;
 use crate::kafka::cadmin::CAdminClient;
@@ -70,8 +71,8 @@ impl CTopic {
         CConsumer {
             consumer: Arc::new(consumer),
             consumer_context,
-            tx,
-            rx,
+            tx: ArchPadding::new(tx),
+            rx: ArchPadding::new(rx),
         }
     }
 

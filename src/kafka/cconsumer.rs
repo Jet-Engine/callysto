@@ -24,32 +24,23 @@ use rdkafka::util::AsyncRuntime;
 use rdkafka::ClientConfig;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use cuneiform_fields::prelude::*;
 use tracing::error;
 
 use crate::kafka::runtime::NucleiRuntime;
 
-pub struct CStreamState {
-    tx: Sender<Option<OwnedMessage>>,
-}
-
-impl CStreamState {
-    pub fn new(tx: Sender<Option<OwnedMessage>>) -> Self {
-        Self { tx }
-    }
-}
-
 pub struct CConsumer {
     pub(super) consumer: Arc<BaseConsumer<CConsumerContext>>,
     pub consumer_context: CConsumerContext,
-    pub tx: Sender<Option<OwnedMessage>>,
-    pub rx: Receiver<Option<OwnedMessage>>,
+    pub tx: ArchPadding<Sender<Option<OwnedMessage>>>,
+    pub rx: ArchPadding<Receiver<Option<OwnedMessage>>>,
 }
 
 pin_project! {
     #[derive(Clone)]
     pub struct CStream {
         #[pin]
-        rx: Receiver<Option<OwnedMessage>>
+        rx: ArchPadding<Receiver<Option<OwnedMessage>>>
     }
 }
 
@@ -82,25 +73,25 @@ impl CConsumer {
     ///
     /// Generate stream on demand with unbounded queues.
     fn gen_stream(
-        tx: Sender<Option<OwnedMessage>>,
-        rx: Receiver<Option<OwnedMessage>>,
+        tx: ArchPadding<Sender<Option<OwnedMessage>>>,
+        rx: ArchPadding<Receiver<Option<OwnedMessage>>>,
         consumer: Arc<BaseConsumer<CConsumerContext>>,
     ) -> CStream {
-        let state = CStreamState::new(tx.clone());
+        let handle = thread::Builder::new()
+            .name("cstream-gen".into())
+            .spawn(move || {
+                for m in consumer.iter() {
+                    let msg = match m {
+                        Ok(bm) => Some(bm.detach()),
+                        Err(e) => {
+                            error!("{}", e);
+                            None
+                        }
+                    };
 
-        let handle = thread::spawn(move || {
-            for m in consumer.iter() {
-                let msg = match m {
-                    Ok(bm) => Some(bm.detach()),
-                    Err(e) => {
-                        error!("{}", e);
-                        None
-                    }
-                };
-
-                tx.send(msg);
-            }
-        });
+                    tx.send(msg);
+                }
+            });
 
         CStream { rx: rx.clone() }
     }
