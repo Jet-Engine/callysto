@@ -33,6 +33,7 @@ pub enum CallystoError {
     #[error("UTF-8 Conversion error: {0}")]
     UTF8ConversionError(#[from] Utf8Error),
 
+    #[cfg(feature = "store-rocksdb")]
     #[error("RocksDB Error")]
     RocksDBError(#[from] rocksdb::Error),
 }

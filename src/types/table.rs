@@ -6,7 +6,6 @@ use crate::kafka::contexts::{CConsumerContext, CStatistics};
 use crate::kafka::ctopic::{CTopic, CTP};
 use crate::kafka::enums::ProcessingGuarantee;
 use crate::stores::inmemory::InMemoryStore;
-use crate::stores::rocksdb::RocksDbStore;
 use crate::stores::store::Store;
 use crate::types::collection::Collection;
 use crate::types::context::Context;
@@ -135,8 +134,16 @@ where
                 Ok(Arc::new(db))
             }
             "rocksdb" | "rocks" => {
-                let rdb = RocksDbStore::new(app_name, storage_url, table_name);
-                Ok(Arc::new(rdb))
+                #[cfg(feature = "store-rocksdb")]
+                {
+                    use crate::stores::rocksdb::RocksDbStore;
+                    let rdb = RocksDbStore::new(app_name, storage_url, table_name);
+                    return Ok(Arc::new(rdb));
+                }
+
+                return Err(CallystoError::GeneralError(
+                    "RocksDB feature is not enabled. `store-rocksdb` is the feature name.".into(),
+                ));
             }
             "aerospikedb" | "aerospike" => todo!(),
             storage_backend => Err(CallystoError::GeneralError(format!(
