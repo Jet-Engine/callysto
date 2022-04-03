@@ -1,0 +1,51 @@
+name: cicd
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    - cron: "0 7 * * *"
+
+jobs:
+  build_and_test:
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - nightly-2022-04-02
+
+    name: ${{ matrix.version }} - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install ${{ matrix.version }}
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.version }}-x86_64-unknown-linux-gnu
+          profile: minimal
+          override: true
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Generate Cargo.lock
+        uses: actions-rs/cargo@v1
+        with:
+          command: generate-lockfile
+
+      - name: Start Docker containers for Zookeeper, Kafka and Schema Registry
+        run: docker-compose down -v && docker-compose up -d
+
+      - name: Run default tests
+        uses: actions-rs/cargo@v1
+        timeout-minutes: 40
+        with:
+          command: test
+          args: --all -- --test-threads 1 --nocapture
+
+      - name: Check build
+        uses: actions-rs/cargo@v1
+        timeout-minutes: 40
+        with:
+          command: build
