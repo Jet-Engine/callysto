@@ -15,7 +15,9 @@ pub mod prelude {
     pub use super::collection::*;
     pub use super::context::*;
     pub use super::cronjob::*;
+    pub use super::route::*;
     pub use super::service::*;
+    pub use super::table::*;
     pub use super::table_agent::*;
     pub use super::task::*;
     pub use super::timer::*;

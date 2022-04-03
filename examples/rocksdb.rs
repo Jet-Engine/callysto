@@ -1,3 +1,4 @@
+use callysto::kafka::prelude::*;
 use callysto::prelude::message::*;
 use callysto::prelude::*;
 use std;

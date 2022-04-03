@@ -147,7 +147,7 @@ where
     }
 
     fn on_changelog_sent(&self) -> Result<()> {
-        match self.config.processing_guarantee {
+        match self.config.kafka_config.processing_guarantee {
             ProcessingGuarantee::AtLeastOnce => {
                 todo!()
             }

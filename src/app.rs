@@ -37,6 +37,9 @@ use crate::types::table::CTable;
 use crate::types::table_agent::{CTableAgent, TableAgent, Tables};
 use crate::types::task::Task;
 
+use crate::prelude::*;
+use futures::Stream;
+
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
 ///
@@ -177,6 +180,13 @@ where
     }
 
     ///
+    /// Build the application with the given config
+    pub fn with_config(&mut self, config: Config) -> &mut Self {
+        self.config = config;
+        self
+    }
+
+    ///
     /// By default `callysto-app` is used internally as application name.
     /// If you want to change this you can use this method.
     /// This method will change also consumer group names and changelog topic names.
@@ -255,7 +265,7 @@ where
 
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
-        F: Send + Sync + 'static + Fn(Option<OwnedMessage>, Context<State>) -> Fut,
+        F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
@@ -339,52 +349,55 @@ where
         cc.set("bootstrap.servers", &*self.brokers)
             .set(
                 "enable.auto.commit",
-                format!("{}", self.config.enable_auto_commit),
+                format!("{}", self.config.kafka_config.enable_auto_commit),
             )
             .set(
                 "auto.offset.reset",
-                format!("{}", self.config.auto_offset_reset),
+                format!("{}", self.config.kafka_config.auto_offset_reset),
             )
             .set(
                 "auto.commit.interval.ms",
-                format!("{}", self.config.auto_commit_interval_ms),
+                format!("{}", self.config.kafka_config.auto_commit_interval_ms),
             )
             .set(
                 "enable.auto.offset.store",
-                format!("{}", self.config.enable_auto_offset_store),
+                format!("{}", self.config.kafka_config.enable_auto_offset_store),
             )
             .set(
                 "max.poll.interval.ms",
-                format!("{}", self.config.max_poll_interval_ms),
+                format!("{}", self.config.kafka_config.max_poll_interval_ms),
             )
             .set(
                 "max.partition.fetch.bytes",
-                format!("{}", self.config.max_partition_fetch_bytes),
+                format!("{}", self.config.kafka_config.max_partition_fetch_bytes),
             )
             .set(
                 "fetch.wait.max.ms",
-                format!("{}", self.config.fetch_max_wait_ms),
+                format!("{}", self.config.kafka_config.fetch_max_wait_ms),
             )
             .set(
                 "request.timeout.ms",
-                format!("{}", self.config.request_timeout_ms),
+                format!("{}", self.config.kafka_config.request_timeout_ms),
             )
-            .set("check.crcs", format!("{}", self.config.check_crcs))
+            .set(
+                "check.crcs",
+                format!("{}", self.config.kafka_config.check_crcs),
+            )
             .set(
                 "statistics.interval.ms",
-                format!("{}", self.config.statistics_interval_ms),
+                format!("{}", self.config.kafka_config.statistics_interval_ms),
             )
             .set(
                 "session.timeout.ms",
-                format!("{}", self.config.session_timeout_ms),
+                format!("{}", self.config.kafka_config.session_timeout_ms),
             )
             .set(
                 "heartbeat.interval.ms",
-                format!("{}", self.config.heartbeat_interval_ms),
+                format!("{}", self.config.kafka_config.heartbeat_interval_ms),
             )
             .set(
                 "isolation.level",
-                format!("{}", self.config.isolation_level),
+                format!("{}", self.config.kafka_config.isolation_level),
             )
             // Consumer group ID
             .set("group.id", self.app_name.as_str());
@@ -392,11 +405,11 @@ where
         // Security settings
         cc.set(
             "security.protocol",
-            format!("{}", self.config.security_protocol),
+            format!("{}", self.config.kafka_config.security_protocol),
         );
 
         use crate::kafka::enums::SecurityProtocol::*;
-        let cc = match self.config.security_protocol {
+        let cc = match self.config.kafka_config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
                 self.build_ssl_context(cc)
@@ -417,16 +430,19 @@ where
 
     fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
         self.config
+            .kafka_config
             .sasl_mechanism
             .clone()
             .map(|e| cc.set("sasl.mechanism", format!("{}", e)));
 
         self.config
+            .kafka_config
             .sasl_username
             .clone()
             .map(|e| cc.set("sasl.username", e));
 
         self.config
+            .kafka_config
             .sasl_password
             .clone()
             .map(|e| cc.set("sasl.password", e));
@@ -436,26 +452,31 @@ where
 
     fn build_ssl_context(&self, mut cc: ClientConfig) -> ClientConfig {
         self.config
+            .kafka_config
             .ssl_certificate_location
             .clone()
             .map(|e| cc.set("ssl.certificate.location", e));
 
         self.config
+            .kafka_config
             .ssl_ca_location
             .clone()
             .map(|e| cc.set("ssl.ca.location", e));
 
         self.config
+            .kafka_config
             .ssl_key_location
             .clone()
             .map(|e| cc.set("ssl.key.location", e));
 
         self.config
+            .kafka_config
             .ssl_key_password
             .clone()
             .map(|e| cc.set("ssl.key.password", e));
 
         self.config
+            .kafka_config
             .ssl_endpoint_identification_algorithm
             .clone()
             .map(|e| cc.set("ssl.endpoint.identification.algorithm", format!("{}", e)));

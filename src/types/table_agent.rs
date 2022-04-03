@@ -7,6 +7,7 @@ use crate::types::table::CTable;
 use async_trait::*;
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use futures_lite::StreamExt;
 use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
 use rdkafka::message::OwnedMessage;
@@ -154,7 +155,7 @@ where
                     }
                     let state = self.state.clone();
                     let tables = self.tables.clone();
-                    let message = consumer.recv().await;
+                    let message = consumer.cstream().next().await.unwrap();
                     if message.is_none() {
                         // Error while receiving from Kafka.
                         break 'fallback;

@@ -1,3 +1,5 @@
+use callysto::futures::StreamExt;
+use callysto::prelude::cconsumer::CStream;
 use callysto::prelude::message::*;
 use callysto::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -16,18 +18,20 @@ impl SharedState {
     }
 }
 
-async fn counter_agent(msg: Option<OwnedMessage>, ctx: Context<SharedState>) -> Result<()> {
-    // Read the incoming bytes as string
-    msg.map(|m| {
-        let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
-        println!("Received payload: `{}`", strm);
-    });
+async fn counter_agent(mut stream: CStream, ctx: Context<SharedState>) -> Result<()> {
+    while let Some(msg) = stream.next().await {
+        // Read the incoming bytes as string
+        msg.map(|m| {
+            let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
+            println!("Received payload: `{}`", strm);
+        });
 
-    // Increment message counter and print it.
-    // Show how you can store an application state.
-    let state = ctx.state();
-    let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
-    println!("Message count: `{}`", msgcount);
+        // Increment message counter and print it.
+        // Show how you can store an application state.
+        let state = ctx.state();
+        let msgcount = state.value.fetch_add(1, Ordering::AcqRel);
+        println!("Message count: `{}`", msgcount);
+    }
 
     Ok(())
 }

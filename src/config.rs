@@ -7,6 +7,28 @@ pub struct Config {
     pub daemonize: bool,
 
     ///
+    /// Kafka Config for the service
+    pub kafka_config: KafkaConfig,
+}
+
+impl Config {
+    fn validate(&self) {
+        todo!("Validate")
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            daemonize: false,
+            kafka_config: KafkaConfig::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct KafkaConfig {
+    ///
     /// Processing guarantee that should be used.
     pub processing_guarantee: ProcessingGuarantee,
 
@@ -121,16 +143,9 @@ pub struct Config {
     pub sasl_password: Option<String>,
 }
 
-impl Config {
-    fn validate(&self) {
-        todo!("Validate")
-    }
-}
-
-impl Default for Config {
+impl Default for KafkaConfig {
     fn default() -> Self {
-        Config {
-            daemonize: false,
+        Self {
             processing_guarantee: ProcessingGuarantee::AtLeastOnce,
             session_timeout_ms: 60_000,
             enable_auto_commit: false,
