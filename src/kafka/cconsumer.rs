@@ -8,6 +8,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::kafka::contexts::CConsumerContext;
+use cuneiform_fields::prelude::*;
 use futures::future::FutureExt;
 use futures::stream::{BoxStream, StreamExt, Unfold};
 use futures::{pin_mut, stream, Stream};
@@ -24,7 +25,6 @@ use rdkafka::util::AsyncRuntime;
 use rdkafka::ClientConfig;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use cuneiform_fields::prelude::*;
 use tracing::error;
 
 use crate::kafka::runtime::NucleiRuntime;
@@ -51,7 +51,7 @@ impl Stream for CStream {
         let mut this = self.project();
         if let Ok(mut inner) = this.rx.recv() {
             // XXX: Always return something, inner Kafka message or no message at all.
-            // You can unwrap on `Next` stream iterator.
+            // You can unwrap safely on `Next` stream iterator.
             Poll::Ready(Some(inner))
         } else {
             Poll::Pending

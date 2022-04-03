@@ -57,6 +57,8 @@ pub mod types;
 mod runtime;
 mod stores;
 
+/// Reexport of Futures
+pub use futures;
 /// Reexport of http_types
 pub use http_types;
 /// Reexport of rdkafka
@@ -70,8 +72,8 @@ pub mod prelude {
     pub use super::http_types::{
         Request as CWebRequest, Response as CWebResponse, Result as CWebResult,
     };
-    pub use super::kafka::*;
+    pub use super::kafka::prelude::*;
     pub use super::rdkafka::*;
-    pub use crate::types::prelude::*;
-    pub use crate::types::table::*;
+    pub use super::types::prelude::*;
+    pub use super::types::table::*;
 }

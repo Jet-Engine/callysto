@@ -1,7 +1,7 @@
+use callysto::futures::StreamExt;
 use callysto::prelude::cconsumer::CStream;
 use callysto::prelude::message::*;
 use callysto::prelude::*;
-use futures::StreamExt;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 

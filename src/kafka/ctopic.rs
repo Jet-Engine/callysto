@@ -1,9 +1,9 @@
+use cuneiform_fields::arch::ArchPadding;
 use std::borrow::Borrow;
 use std::future::Future;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-use cuneiform_fields::arch::ArchPadding;
 
 use crate::errors::*;
 use crate::kafka::cadmin::CAdminClient;
