@@ -129,7 +129,7 @@ services:
       PORT: 9021
 
   ksql-datagen:
-    image: confluentinc/ksqldb-examples:7.0.1
+    image: confluentinc/ksqldb-examples:7.0.2
     hostname: ksql-datagen
     container_name: ksql-datagen
     depends_on:
