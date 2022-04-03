@@ -1,6 +1,5 @@
-use callysto::kafka::prelude::*;
-use callysto::prelude::message::*;
 use callysto::prelude::*;
+use callysto::prelude::message::*;
 use std;
 
 async fn durable_agent(

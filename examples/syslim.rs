@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::ffi::CString;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn main() {
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) };
