@@ -36,4 +36,8 @@ pub enum CallystoError {
     #[cfg(feature = "store-rocksdb")]
     #[error("RocksDB Error")]
     RocksDBError(#[from] rocksdb::Error),
+
+    #[cfg(feature = "sink-elastic")]
+    #[error("ElasticSearch Error")]
+    ElasticSearchError(#[from] elasticsearch::Error)
 }

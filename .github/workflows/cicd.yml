@@ -49,3 +49,8 @@ jobs:
         timeout-minutes: 40
         with:
           command: build
+
+      - name: Build Docs
+        with:
+          command: doc
+          args: --features docs
