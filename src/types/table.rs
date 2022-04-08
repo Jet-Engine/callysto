@@ -427,6 +427,10 @@ where
         // self.call_recover_callbacks()
         todo!()
     }
+
+    fn into_service(&self) -> Arc<&dyn Service<State>> {
+        Arc::new(self)
+    }
 }
 
 #[async_trait]

@@ -17,8 +17,8 @@
 #![allow(unused_must_use)]
 #![allow(unused)]
 // XXX: Reverse trait coercion is needed for layered composition.
-#![feature(trait_upcasting)]
-#![feature(type_alias_impl_trait)]
+// #![feature(trait_upcasting)]
+// #![feature(type_alias_impl_trait)]
 #![allow(incomplete_features)]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/vertexclique/callysto/master/art/callysto_logo.png"

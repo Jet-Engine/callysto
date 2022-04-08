@@ -6,6 +6,7 @@ use async_trait::*;
 use rdkafka::message::OwnedMessage;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait Store<State>: Service<State>
@@ -46,4 +47,6 @@ where
         active_tps: Vec<CTP>,
         standby_tps: Vec<CTP>,
     ) -> Result<()>;
+
+    fn into_service(&self) -> Arc<&dyn Service<State>>;
 }
