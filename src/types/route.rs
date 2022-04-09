@@ -41,7 +41,7 @@ where
     async fn call(&self, request: Request, ctx: Context<State>) -> http_types::Result<Response> {
         let fut = (self.clo)(request, ctx);
         let res = fut.await?;
-        Ok(res.into())
+        Ok(res)
     }
 
     fn get_slug(&self) -> String {

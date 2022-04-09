@@ -48,7 +48,7 @@ async-trait = "0.1"
 futures = "0.3"
 futures-timer = "3.0"
 crossbeam-channel = "0.5"
-rdkafka = { version = "0.26", default-features = false, features = ["libz"]}
+rdkafka = { version = "0.28.0", default-features = false, features = ["libz"]}
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.2"
@@ -61,6 +61,7 @@ http-types = "2.12"
 async-h1 = "2.3"
 pin-project-lite = "0.2.8"
 futures-lite = "1.12"
+dirs = "4.0.0"
 
 # Optionals
 rocksdb = { version = "0.18", optional = true }

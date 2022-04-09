@@ -55,16 +55,18 @@ pub struct CStatistics {
     pub ts: i64,
     /// Wall clock time, in seconds since the Unix epoch.
     pub time: i64,
+    /// Time since this client instance was created, in microseconds.
+    pub age: i64,
     /// The number of operations (callbacks, events, etc.) waiting in queue.
     pub replyq: i64,
     /// The current number of messages in producer queues.
-    pub msg_cnt: i64,
+    pub msg_cnt: u64,
     /// The current total size of messages in producer queues.
-    pub msg_size: i64,
+    pub msg_size: u64,
     /// The maximum number of messages allowed in the producer queues.
-    pub msg_max: i64,
+    pub msg_max: u64,
     /// The maximum total size of messages allowed in the producer queues.
-    pub msg_size_max: i64,
+    pub msg_size_max: u64,
     /// The total number of requests sent to brokers.
     pub tx: i64,
     /// The total number of bytes transmitted to brokers.
