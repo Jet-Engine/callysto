@@ -8,8 +8,7 @@
 ### Rust MSRV
 We are using:
 ```
-nightly-x86_64-unknown-linux-gnu (default)
-rustc 1.61.0-nightly (1eb72580d 2022-03-08)
+cargo 1.60.0 (d1fd9fe 2022-03-01)
 ```
 
 ### Running
