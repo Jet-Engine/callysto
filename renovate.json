@@ -1,5 +1,30 @@
 {
-  "extends": [
-    "config:base"
-  ]
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "packagePatterns": ["^futures[-_]?"],
+      "groupName": "futures packages"
+    },
+    {
+      "packagePatterns": ["^serde[-_]?"],
+      "groupName": "serde packages"
+    },
+    {
+      "packagePatterns": ["^tracing[-_]?"],
+      "excludePackageNames": ["tracing-opentelemetry"],
+      "groupName": "tracing packages"
+    },
+    {
+      "groupName": "dependencies-non-major",
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["patch", "minor"]
+    },
+    {
+      "groupName": "devDependencies-non-major",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch", "minor"]
+    }
+  ],
+  "schedule": ["every weekend"]
 }
