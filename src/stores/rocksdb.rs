@@ -484,4 +484,8 @@ where
     ) -> Result<()> {
         todo!()
     }
+
+    fn into_service(self) -> Arc<dyn Service<State>> {
+        Arc::new(self)
+    }
 }

@@ -263,6 +263,19 @@ where
         self
     }
 
+    ///
+    /// An Agent is an service that consumes a topic as stream and processes it internally.
+    /// There is no
+    ///
+    /// # Example
+    /// ```rust
+    /// use callysto::prelude::*;
+    ///
+    /// fn main() {
+    ///     let mut app = Callysto::new();
+    ///     app.with_name("amazing-service-of-mine");
+    /// }
+    /// ```
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
         F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,

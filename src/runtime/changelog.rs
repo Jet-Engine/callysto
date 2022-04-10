@@ -71,12 +71,14 @@ where
 {
     pub fn new(table: CTable<State>) -> Self {
         let storage = table.storage();
+        // XXX: Use this table as a service when trait upcasting is going to be available in the stable compiler.
+        let table_service: Arc<dyn Service<State>> = Arc::new(table.clone());
 
         Self {
             table,
-            storage: storage.clone(),
+            storage,
             dirty_markers: Arc::new(TTas::new(HashSet::<Vec<u8>>::with_capacity(1 << 7))),
-            dependencies: vec![storage],
+            dependencies: vec![table_service],
         }
     }
 
@@ -169,6 +171,10 @@ where
         standby_tps: Vec<CTP>,
     ) -> Result<()> {
         todo!()
+    }
+
+    fn into_service(&self) -> Arc<&dyn Service<State>> {
+        Arc::new(self)
     }
 }
 

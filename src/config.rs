@@ -3,10 +3,6 @@ use crate::kafka::enums::*;
 #[derive(Clone)]
 pub struct Config {
     ///
-    /// Daemonize the service
-    pub daemonize: bool,
-
-    ///
     /// Kafka Config for the service
     pub kafka_config: KafkaConfig,
 }
@@ -20,7 +16,6 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            daemonize: false,
             kafka_config: KafkaConfig::default(),
         }
     }
