@@ -4,6 +4,8 @@
 ### Requirements
 * cmake
 * clang
+* libtool
+* libstdc++-devel
 
 ### Rust MSRV
 We are using:
