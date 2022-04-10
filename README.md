@@ -8,7 +8,7 @@
 ### Rust MSRV
 We are using:
 ```
-cargo 1.60.0 (d1fd9fe 2022-03-01)
+rustc 1.60.0 (7737e0b5c 2022-04-04)
 ```
 
 ### Running
