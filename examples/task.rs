@@ -1,6 +1,6 @@
 use callysto::prelude::*;
 
-async fn on_start(ctx: Context<()>) -> Result<()> {
+async fn on_start(_ctx: Context<()>) -> Result<()> {
     println!("Started Task Example.");
 
     Ok(())

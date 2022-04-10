@@ -173,8 +173,8 @@ where
         todo!()
     }
 
-    fn into_service(&self) -> Arc<&dyn Service<State>> {
-        Arc::new(self)
+    fn into_service(&self) -> &dyn Service<State> {
+        self
     }
 }
 

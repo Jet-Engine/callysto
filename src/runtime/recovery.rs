@@ -50,25 +50,19 @@ where
 
     async fn consume_changelogs(&self) -> Result<Vec<JoinHandle<()>>> {
         let tables = self.tables.clone();
-        let consumers: Vec<(Arc<CTable<State>>, Arc<CConsumer>)> = self
+        let tasks: Vec<JoinHandle<()>> = self
             .tables
             .iter()
             .map(|(_, table)| {
                 let consumer = table.changelog_topic.consumer();
                 (table, Arc::new(consumer))
             })
-            .collect();
-
-        let tasks: Vec<JoinHandle<()>> = consumers
-            .into_iter()
             .map(|(table, consumer)| {
                 info!(
                     "Recovery is starting for changelog topic: `{}`",
                     table.changelog_topic_name()
                 );
                 let changelog_topic_name = table.changelog_topic_name();
-                let table = table.to_owned();
-                let consumer = consumer.clone();
                 nuclei::spawn(async move {
                     info!(
                         "Recovery started for changelog topic: `{}`",

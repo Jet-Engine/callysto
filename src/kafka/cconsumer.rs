@@ -93,6 +93,6 @@ impl CConsumer {
                 }
             });
 
-        CStream { rx: rx.clone() }
+        CStream { rx }
     }
 }

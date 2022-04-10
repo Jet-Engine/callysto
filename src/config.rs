@@ -1,6 +1,6 @@
 use crate::kafka::enums::*;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Config {
     ///
     /// Kafka Config for the service
@@ -10,14 +10,6 @@ pub struct Config {
 impl Config {
     fn validate(&self) {
         todo!("Validate")
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            kafka_config: KafkaConfig::default(),
-        }
     }
 }
 

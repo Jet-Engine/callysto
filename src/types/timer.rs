@@ -60,7 +60,7 @@ where
         let fut = (self.clo)(req);
         let res = fut.await?;
         let _ = Delay::new(std::time::Duration::from_secs_f64(self.interval)).await;
-        Ok(res.into())
+        Ok(res)
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
@@ -70,11 +70,8 @@ where
             loop {
                 let state = self.state.clone();
                 let context = Context::new(state);
-                match Task::<State>::call(self, context).await {
-                    Err(e) => {
-                        error!("CTimer failed: {}", e);
-                    }
-                    _ => {}
+                if let Err(e) = Task::<State>::call(self, context).await {
+                    error!("CTimer failed: {}", e);
                 }
             }
         };

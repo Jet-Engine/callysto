@@ -1,6 +1,5 @@
 use callysto::prelude::message::*;
 use callysto::prelude::*;
-use std;
 
 async fn inmemory_agent(
     msg: Option<OwnedMessage>,

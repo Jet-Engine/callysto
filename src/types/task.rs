@@ -68,7 +68,7 @@ where
     async fn call(&self, req: Context<State>) -> CResult<()> {
         let fut = (self.clo)(req);
         let res = fut.await?;
-        Ok(res.into())
+        Ok(res)
     }
 
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
@@ -77,11 +77,8 @@ where
             info!("Started CTask - App `{}`", self.app_name.clone());
 
             let context = Context::new(state);
-            match Task::<State>::call(self, context).await {
-                Err(e) => {
-                    error!("CTask failed: {}", e);
-                }
-                _ => {}
+            if let Err(e) = Task::<State>::call(self, context).await {
+                error!("CTask failed: {}", e);
             }
         };
 

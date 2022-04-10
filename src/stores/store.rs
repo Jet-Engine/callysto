@@ -48,5 +48,6 @@ where
         standby_tps: Vec<CTP>,
     ) -> Result<()>;
 
-    fn into_service(&self) -> Arc<&dyn Service<State>>;
+    #[allow(clippy::wrong_self_convention)]
+    fn into_service(&self) -> &dyn Service<State>;
 }

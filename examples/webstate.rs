@@ -16,7 +16,7 @@ impl SharedState {
     }
 }
 
-async fn web_counter(req: CWebRequest, ctx: Context<SharedState>) -> CWebResult<CWebResponse> {
+async fn web_counter(_req: CWebRequest, ctx: Context<SharedState>) -> CWebResult<CWebResponse> {
     let mut res = CWebResponse::new(StatusCode::Ok);
     let state = ctx.state();
     let current = state.value.fetch_add(1, Ordering::AcqRel);
