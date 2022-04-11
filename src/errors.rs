@@ -39,5 +39,5 @@ pub enum CallystoError {
 
     #[cfg(feature = "sink-elastic")]
     #[error("ElasticSearch Error")]
-    ElasticSearchError(#[from] elasticsearch::Error)
+    ElasticSearchError(#[from] elasticsearch::Error),
 }

@@ -48,10 +48,10 @@ pub mod errors;
 pub mod kafka;
 /// Metric implementations to instrument Callysto application
 pub mod sensors;
-/// Callysto's building blocks. All modules are under types.
-pub mod types;
 /// Sink implementations for streams
 pub mod sinks;
+/// Callysto's building blocks. All modules are under types.
+pub mod types;
 
 mod runtime;
 mod stores;
@@ -73,7 +73,7 @@ pub mod prelude {
     };
     pub use super::kafka::prelude::*;
     pub use super::rdkafka::*;
+    pub use super::sinks::*;
     pub use super::types::prelude::*;
     pub use super::types::table::*;
-    pub use super::sinks::*;
 }

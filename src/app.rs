@@ -13,7 +13,7 @@ use http_types::Request;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
 use lightproc::prelude::RecoverableHandle;
-use nuclei::join_handle::JoinHandle;
+use nuclei::Task as AsyncTask;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
@@ -553,7 +553,7 @@ where
         // Load all background workers
         self.background_workers();
 
-        let mut agents: Vec<JoinHandle<()>> = self
+        let mut agents: Vec<AsyncTask<()>> = self
             .agents
             .iter()
             .map(|(aid, agent)| {
@@ -572,7 +572,7 @@ where
 
         let agent_handles = join_all(agents);
 
-        let table_agents: Vec<JoinHandle<()>> = self
+        let table_agents: Vec<AsyncTask<()>> = self
             .table_agents
             .iter()
             .map(|(aid, agent)| {
@@ -591,7 +591,7 @@ where
 
         let table_agent_handles = join_all(table_agents);
 
-        let services: Vec<JoinHandle<()>> = self
+        let services: Vec<AsyncTask<()>> = self
             .services
             .iter()
             .map(|(sid, service)| {
@@ -610,7 +610,7 @@ where
 
         let service_handles = join_all(services);
 
-        let tasks: Vec<JoinHandle<()>> = self
+        let tasks: Vec<AsyncTask<()>> = self
             .tasks
             .iter()
             .map(|(tid, task)| {
@@ -627,7 +627,7 @@ where
 
         let task_handles = join_all(tasks);
 
-        let timers: Vec<JoinHandle<()>> = self
+        let timers: Vec<AsyncTask<()>> = self
             .timers
             .iter()
             .map(|(tid, timer)| {

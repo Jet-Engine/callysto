@@ -44,8 +44,8 @@ store-rocksdb = ["rocksdb"]
 sink-elastic = ["elasticsearch"]
 
 [dependencies]
-#nuclei = { version = "0.1.3", default-features = false, features = ["iouring", "asyncstd"] }
-nuclei = { version = "0.1.3", default-features = false, features = ["epoll", "asyncstd"] }
+#nuclei = { version = "0.2", default-features = false, features = ["iouring", "asyncstd"] }
+nuclei = { version = "0.2", default-features = false, features = ["epoll", "tokio"] }
 lightproc = "0.3.5"
 lever = "0.1.2"
 thiserror = "1.0"

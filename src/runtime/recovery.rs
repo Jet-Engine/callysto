@@ -11,7 +11,7 @@ use futures::{pin_mut, FutureExt};
 use futures::{SinkExt, StreamExt};
 use lever::prelude::LOTable;
 use lever::sync::atomics::AtomicBox;
-use nuclei::join_handle::JoinHandle;
+use nuclei::Task;
 use rdkafka::error::KafkaResult;
 use rdkafka::message::{BorrowedMessage, OwnedMessage};
 use std::collections::HashMap;
@@ -48,7 +48,7 @@ where
         }
     }
 
-    async fn consume_changelogs(&self) -> Result<Vec<JoinHandle<()>>> {
+    async fn consume_changelogs(&self) -> Result<Vec<Task<()>>> {
         let tables = self.tables.clone();
         let consumers: Vec<(Arc<CTable<State>>, Arc<CConsumer>)> = self
             .tables
@@ -59,7 +59,7 @@ where
             })
             .collect();
 
-        let tasks: Vec<JoinHandle<()>> = consumers
+        let tasks: Vec<Task<()>> = consumers
             .into_iter()
             .map(|(table, consumer)| {
                 info!(
