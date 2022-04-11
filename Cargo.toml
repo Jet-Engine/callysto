@@ -33,7 +33,7 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["sink-elastic"]
+default = ["epoll", "asyncexec"]
 docs = [
     "store-rocksdb",
     "sink-elastic"
