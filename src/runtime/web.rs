@@ -64,7 +64,8 @@ where
                 if let Err(err) = async_h1::accept(stream, |req| dispatcher.serve(req)).await {
                     error!("Connection error: {:#?}", err);
                 }
-            });
+            })
+            .detach();
         }
     }
 }
@@ -82,9 +83,10 @@ where
         let closure = async move {
             nuclei::spawn_blocking(|| {
                 nuclei::drive(async {
-                    Delay::new(std::time::Duration::from_millis(10)).await;
+                    Delay::new(std::time::Duration::from_millis(5)).await;
                 })
-            });
+            })
+            .detach();
 
             for x in &self.dependencies {
                 info!("WebServer - {} - Dependencies are starting", self.app_name);
@@ -106,7 +108,7 @@ where
                         break 'main;
                     }
 
-                    match Handle::<TcpListener>::bind("0.0.0.0:8000") {
+                    match Handle::<TcpListener>::bind("0.0.0.0:3000") {
                         Ok(handle) => {
                             let http = self.listen(handle);
                             http.await;

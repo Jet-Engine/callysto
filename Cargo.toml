@@ -38,16 +38,27 @@ docs = [
     "store-rocksdb",
     "sink-elastic"
 ]
+# IO systems
+iouring = ["nuclei/iouring"]
+epoll = ["nuclei/epoll"]
+# Executor
+asyncexec = ["nuclei/async-exec"]
+tokio = ["nuclei/tokio"]
+tokio03 = ["nuclei/tokio03"]
+tokio02 = ["nuclei/tokio02"]
 # Storage systems
 store-rocksdb = ["rocksdb"]
 # Sinks
-sink-elastic = ["elasticsearch"]
+sink-elastic = [
+    "tokio",
+    "elasticsearch"
+]
 
 [dependencies]
-#nuclei = { version = "0.2", default-features = false, features = ["iouring", "asyncstd"] }
-nuclei = { version = "0.2", default-features = false, features = ["epoll", "tokio"] }
+#nuclei = { version = "0.2", default-features = false, features = ["epoll", "async-exec"] }
+nuclei = "0.2"
 lightproc = "0.3.5"
-lever = "0.1.2"
+lever = "0.1.3"
 thiserror = "1.0"
 async-trait = "0.1"
 futures = "0.3"

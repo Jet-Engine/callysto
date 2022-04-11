@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, trace};
 
 #[derive(Clone, Debug)]
 pub struct CConsumerContext {
@@ -30,7 +30,7 @@ impl CConsumerContext {
 
 impl ClientContext for CConsumerContext {
     fn stats(&self, statistics: Statistics) {
-        debug!("Statistics received: {:?}", statistics);
+        trace!("Statistics received: {:?}", statistics);
         let cstat: CStatistics = unsafe { std::mem::transmute(statistics) };
         self.statistics.replace_with(|_| {
             let cstats = cstat.clone();

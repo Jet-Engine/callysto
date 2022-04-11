@@ -4,6 +4,8 @@ use callysto::sinks::elasticsearch::{CElasticSearchDocument, CElasticSearchSink}
 use futures::SinkExt;
 use serde::*;
 
+// NOTE: This example requires `tokio` feature to be enabled.
+
 #[derive(Serialize, Deserialize)]
 pub struct SpotifyDocument {
     song_url: String,

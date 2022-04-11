@@ -16,7 +16,7 @@ use std::convert::Infallible;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::vec::Drain;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 use url::Url;
 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ where
                     .body(edoc)
                     .send()
                     .await;
-                warn!("CElasticSearchSink - Ingestion status: {:#?}", res);
+                trace!("CElasticSearchSink - Ingestion status: {:#?}", res);
             }
         });
 
