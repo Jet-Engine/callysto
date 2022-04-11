@@ -58,6 +58,7 @@ jobs:
           command: build
 
       - name: Build Docs
+        uses: actions-rs/cargo@v1
         with:
           command: doc
           args: --features docs
