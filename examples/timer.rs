@@ -1,6 +1,6 @@
 use callysto::prelude::*;
 
-async fn check_liveness(ctx: Context<()>) -> Result<()> {
+async fn check_liveness(_ctx: Context<()>) -> Result<()> {
     println!("Deckard Cain is identifying you.");
 
     Ok(())

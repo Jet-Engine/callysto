@@ -29,14 +29,13 @@ pub struct InMemoryStore {
 
 impl InMemoryStore {
     pub fn new(app_name: String, storage_url: Url, table_name: String) -> Self {
-        let mut rds = Self {
+        Self {
             app_name,
             storage_url,
             table_name,
             service_state: Arc::new(AtomicBox::new(ServiceState::PreStart)),
             dbs: LOTable::default(),
-        };
-        rds
+        }
     }
 
     fn db_for_partition(&self, partition: usize) -> Result<Arc<InMemoryDb>> {
@@ -70,7 +69,7 @@ where
     }
 
     async fn restart(&self) -> Result<()> {
-        <Self as Service<State>>::stop(&self)
+        <Self as Service<State>>::stop(self)
             .and_then(|_| <Self as Service<State>>::start(self))
             .await;
 
@@ -165,7 +164,7 @@ where
         let offset = self
             .db_for_partition(tp.partition)?
             .get(&CALLYSTO_OFFSET_KEY.to_vec())
-            .ok_or(CallystoError::GeneralError("Offset fetch failed.".into()))
+            .ok_or_else(|| CallystoError::GeneralError("Offset fetch failed.".into()))
             .map_or(None, |e| {
                 Option::from(usize::from_ne_bytes(e.as_slice().try_into().unwrap()))
             });
@@ -250,7 +249,7 @@ where
         todo!()
     }
 
-    fn into_service(&self) -> Arc<&dyn Service<State>> {
-        Arc::new(self)
+    fn into_service(&self) -> &dyn Service<State> {
+        self
     }
 }

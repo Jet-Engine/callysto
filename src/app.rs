@@ -78,10 +78,8 @@ impl Callysto<()> {
     /// ```rust
     /// use callysto::prelude::*;
     ///
-    /// fn main() {
-    ///     let mut app = Callysto::new();
-    ///     app.with_name("example-app");
-    /// }
+    /// let mut app = Callysto::new();
+    /// app.with_name("example-app");
     /// ```
     pub fn new() -> Self {
         Self::with_state(())
@@ -116,11 +114,9 @@ where
     ///    name: String,
     /// }
     ///
-    /// fn main() {
-    ///     let state = State { name: "Callysto".into() };
-    ///     let mut app = Callysto::with_state(state);
-    ///     app.with_name("stateful-app");
-    /// }
+    /// let state = State { name: "Callysto".into() };
+    /// let mut app = Callysto::with_state(state);
+    /// app.with_name("stateful-app");
     /// ```
     pub fn with_state(state: State) -> Self {
         Self {
@@ -165,10 +161,8 @@ where
     /// ```rust
     /// use callysto::prelude::*;
     ///
-    /// fn main() {
-    ///     let mut app = Callysto::new();
-    ///     app.with_storage("rocksdb:///home/callysto/datadir");
-    /// }
+    /// let mut app = Callysto::new();
+    /// app.with_storage("rocksdb:///home/callysto/datadir");
     /// ```
     pub fn with_storage<T>(&mut self, url: T) -> &mut Self
     where
@@ -197,10 +191,8 @@ where
     /// ```rust
     /// use callysto::prelude::*;
     ///
-    /// fn main() {
-    ///     let mut app = Callysto::new();
-    ///     app.with_name("amazing-service-of-mine");
-    /// }
+    /// let mut app = Callysto::new();
+    /// app.with_name("amazing-service-of-mine");
     /// ```
     pub fn with_name<T: AsRef<str>>(&mut self, name: T) -> &mut Self {
         self.app_name = name.as_ref().to_string();
@@ -217,10 +209,8 @@ where
     /// ```rust
     /// use callysto::prelude::*;
     ///
-    /// fn main() {
-    ///     let mut app = Callysto::new();
-    ///     app.with_brokers("kafka1:9092,kafka2:9092,kafka3:9092");
-    /// }
+    /// let mut app = Callysto::new();
+    /// app.with_brokers("kafka1:9092,kafka2:9092,kafka3:9092");
     /// ```
     pub fn with_brokers<T: AsRef<str>>(&mut self, brokers: T) -> &mut Self {
         self.brokers = brokers.as_ref().to_string();
@@ -271,10 +261,8 @@ where
     /// ```rust
     /// use callysto::prelude::*;
     ///
-    /// fn main() {
-    ///     let mut app = Callysto::new();
-    ///     app.with_name("amazing-service-of-mine");
-    /// }
+    /// let mut app = Callysto::new();
+    /// app.with_name("amazing-service-of-mine");
     /// ```
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
@@ -422,7 +410,8 @@ where
         );
 
         use crate::kafka::enums::SecurityProtocol::*;
-        let cc = match self.config.kafka_config.security_protocol {
+
+        match self.config.kafka_config.security_protocol {
             Ssl => {
                 // SSL context is passed down with these arguments.
                 self.build_ssl_context(cc)
@@ -437,15 +426,13 @@ where
                 self.build_ssl_context(cc)
             }
             _ => cc,
-        };
-        cc
+        }
     }
 
     fn build_sasl_context(&self, mut cc: ClientConfig) -> ClientConfig {
         self.config
             .kafka_config
             .sasl_mechanism
-            .clone()
             .map(|e| cc.set("sasl.mechanism", format!("{}", e)));
 
         self.config
@@ -491,7 +478,6 @@ where
         self.config
             .kafka_config
             .ssl_endpoint_identification_algorithm
-            .clone()
             .map(|e| cc.set("ssl.endpoint.identification.algorithm", format!("{}", e)));
 
         cc

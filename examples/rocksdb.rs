@@ -1,6 +1,6 @@
 use callysto::prelude::message::*;
 use callysto::prelude::*;
-use std;
+extern crate dirs;
 
 async fn durable_agent(
     msg: Option<OwnedMessage>,
@@ -28,7 +28,7 @@ async fn durable_agent(
 
 fn main() {
     let mut app = Callysto::default();
-    let home = std::env::home_dir().unwrap();
+    let home = dirs::home_dir().unwrap();
     let home = home.to_string_lossy();
     // Configure application.
     app.with_name("durable-app")

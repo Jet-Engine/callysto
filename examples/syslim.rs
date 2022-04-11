@@ -36,6 +36,6 @@ fn main() {
         page_size,
         page_count,
         usize::try_from(limit.rlim_max).unwrap(),
-        u64::try_from(vfs.f_bavail * vfs.f_frsize).unwrap()
+        u64::try_from(vfs.f_bavail as u64 * vfs.f_frsize).unwrap()
     );
 }

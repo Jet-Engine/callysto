@@ -32,12 +32,9 @@
 /// ```rust,no_run
 /// use callysto::prelude::*;
 ///
-/// fn main() {
-///     let mut app = Callysto::new();
-///     app.with_name("example-app");
-///
-///     app.run();
-/// }
+/// let mut app = Callysto::new();
+/// app.with_name("example-app");
+/// app.run();
 /// ```
 pub mod app;
 /// Application configuration

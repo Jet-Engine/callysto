@@ -4,7 +4,7 @@ use callysto::prelude::*;
 use nuclei::Handle;
 use std::fs::File;
 
-async fn cpuinfo(req: CWebRequest, ctx: Context<()>) -> CWebResult<CWebResponse> {
+async fn cpuinfo(_req: CWebRequest, _ctx: Context<()>) -> CWebResult<CWebResponse> {
     let mut res = CWebResponse::new(StatusCode::Ok);
     let fo = File::open("/proc/cpuinfo").unwrap();
     let mut file = Handle::<File>::new(fo).unwrap();
@@ -15,7 +15,7 @@ async fn cpuinfo(req: CWebRequest, ctx: Context<()>) -> CWebResult<CWebResponse>
     Ok(res)
 }
 
-async fn meminfo(req: CWebRequest, ctx: Context<()>) -> CWebResult<CWebResponse> {
+async fn meminfo(_req: CWebRequest, _ctx: Context<()>) -> CWebResult<CWebResponse> {
     let mut res = CWebResponse::new(StatusCode::Ok);
     let fo = File::open("/proc/meminfo").unwrap();
     let mut file = Handle::<File>::new(fo).unwrap();
