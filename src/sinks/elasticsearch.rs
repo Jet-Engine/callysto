@@ -62,12 +62,11 @@ where
         // tx: ArchPadding<Sender<CElasticSearchDocument<T>>>;
         // rx: ArchPadding<Receiver<CElasticSearchDocument<T>>>;
 
-        let rxt = rx.clone();
         let idx_name = index_name.clone();
         let client = Arc::new(client);
         let client_copy = client.clone();
         let data_sink = nuclei::spawn(async move {
-            while let Ok(item) = rxt.recv() {
+            while let Ok(item) = rx.recv() {
                 let edoc = serde_json::to_string(&item.doc).unwrap();
                 let res = client_copy
                     .index(IndexParts::IndexId(
