@@ -59,6 +59,8 @@ pub use futures;
 pub use http_types;
 /// Reexport of rdkafka
 pub use rdkafka;
+/// Reexport of nuclei
+pub use nuclei;
 
 /// Callysto prelude
 pub mod prelude {
