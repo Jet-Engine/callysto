@@ -190,9 +190,10 @@ where
     async fn start(&self) -> Result<BoxFuture<'_, ()>> {
         let closure = async move {
             for x in &self.dependencies {
+                let short_label = self.shortlabel().await;
                 info!(
                     "ChangelogManager - {} - Dependencies are starting",
-                    self.shortlabel().await
+                    short_label
                 );
                 if !x.started().await {
                     x.start().await;
