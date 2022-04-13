@@ -33,11 +33,11 @@ pub enum CallystoError {
     #[error("UTF-8 Conversion error: {0}")]
     UTF8ConversionError(#[from] Utf8Error),
 
-    #[cfg(feature = "store-rocksdb")]
+    #[cfg(feature = "store_rocksdb")]
     #[error("RocksDB Error")]
     RocksDBError(#[from] rocksdb::Error),
 
-    #[cfg(feature = "sink-elastic")]
+    #[cfg(feature = "sink_elastic")]
     #[error("ElasticSearch Error")]
     ElasticSearchError(#[from] elasticsearch::Error),
 }
