@@ -58,7 +58,7 @@ jobs:
           command: build
 
   check_docs:
-    name: Checking fmt and docs
+    name: docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
