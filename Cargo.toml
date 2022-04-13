@@ -35,8 +35,8 @@ exclude = [
 [features]
 default = ["epoll", "asyncexec"]
 docs = [
-    "store-rocksdb",
-    "sink-elastic"
+    "store_rocksdb",
+    "sink_elastic"
 ]
 # IO systems
 iouring = ["nuclei/iouring"]
@@ -47,9 +47,9 @@ tokio = ["nuclei/tokio"]
 tokio03 = ["nuclei/tokio03"]
 tokio02 = ["nuclei/tokio02"]
 # Storage systems
-store-rocksdb = ["rocksdb"]
+store_rocksdb = ["rocksdb"]
 # Sinks
-sink-elastic = [
+sink_elastic = [
     "tokio",
     "elasticsearch"
 ]
@@ -61,7 +61,7 @@ lightproc = "0.3.5"
 lever = "0.1.3"
 thiserror = "1.0"
 async-trait = "0.1"
-futures = "0.3"
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-timer = "3.0"
 crossbeam-channel = "0.5"
 rdkafka = { version = "0.28.0", default-features = false, features = ["libz"]}

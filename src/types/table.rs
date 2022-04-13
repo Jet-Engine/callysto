@@ -129,7 +129,7 @@ where
                 Ok(Arc::new(db))
             }
             "rocksdb" | "rocks" => {
-                #[cfg(feature = "store-rocksdb")]
+                #[cfg(feature = "store_rocksdb")]
                 {
                     use crate::stores::rocksdb::RocksDbStore;
                     let rdb = RocksDbStore::new(app_name, storage_url, table_name);
@@ -137,7 +137,7 @@ where
                 }
 
                 Err(CallystoError::GeneralError(
-                    "RocksDB feature is not enabled. `store-rocksdb` is the feature name.".into(),
+                    "RocksDB feature is not enabled. `store_rocksdb` is the feature name.".into(),
                 ))
             }
             "aerospikedb" | "aerospike" => todo!(),
