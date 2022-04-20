@@ -596,6 +596,23 @@ where
 
         let service_handles = join_all(services);
 
+        let crons: Vec<JoinHandle<()>> = self
+            .cronjobs
+            .iter()
+            .map(|(tid, task)| {
+                info!("Starting Task with ID: {}", tid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match task.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Task with ID: {}.", tid),
+                    }
+                })
+            })
+            .collect();
+
+        let cron_handles = join_all(crons);
+
         let tasks: Vec<JoinHandle<()>> = self
             .tasks
             .iter()
