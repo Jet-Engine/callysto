@@ -45,7 +45,9 @@ where
 pin_project! {
     pub struct CPostgresSink<T, R>
     where
-    T: Send + Serialize + FromRow<'static, R>,
+    T: Send,
+    T: Serialize,
+    T: FromRow<'static, R>,
     R: Row
     {
         client: Arc<sqlx::postgres::PgPool>,
@@ -58,7 +60,8 @@ pin_project! {
 
 impl<T, R> CPostgresSink<T, R>
 where
-    T: Serialize + Send + 'static,
+    T: Serialize + Send + 'static + FromRow<'static, R>,
+    R: Row,
 {
     async fn setup_pg(dsn: &str, pool_size: u32) -> Result<PgPool> {
         let pgpool = PgPoolOptions::new()
@@ -78,11 +81,11 @@ where
         let client = Arc::new(pgpool);
         let data_sink = nuclei::spawn(async move {
             while let Ok(item) = rx.recv() {
-                let row = sqlx::query_as::<_, T>(&item.query)
-                    .execute(client)
-                    .await
-                    .unwrap();
-                trace!("CPostgresSink - Ingestion status: {:#?}", row);
+                let q = item.query;
+                // Not sure how to handle this just yet
+                // let row = sqlx::query!(q, T).execute(&pgpool).await.unwrap();
+                // trace!("CPostgresSink - Ingestion status: {:#?}", row);
+                trace!("CPostgresSink - Ingestion status:");
             }
         });
 
@@ -97,7 +100,8 @@ where
 
 impl<T, R> Sink<CPostgresRow<T, R>> for CPostgresSink<T, R>
 where
-    T: Serialize + Send,
+    T: Serialize + Send + 'static + FromRow<'static, R>,
+    R: Row,
 {
     type Error = CallystoError;
 
@@ -117,7 +121,7 @@ where
     fn start_send(mut self: Pin<&mut Self>, item: CPostgresRow<T, R>) -> Result<()> {
         let mut this = &mut *self;
         this.tx.send(item).map_err(|e| {
-            CallystoError::GeneralError(format!("Failed to send to index: `{}`", e.0.index_id))
+            CallystoError::GeneralError(format!("Failed to write data to pg: `{:?}`", e.0.query))
         })
     }
 
