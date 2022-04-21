@@ -28,7 +28,7 @@ pub struct CPostgresRow<T, R> {
     _marker: PhantomData<R>,
 }
 
-impl<'a, T, R> CPostgresRow<T, R>
+impl<T, R> CPostgresRow<T, R>
 where
     T: Send + Serialize + FromRow<'static, R>,
     R: Row,
@@ -56,7 +56,7 @@ pin_project! {
     }
 }
 
-impl<T> CPostgresSink<T, R>
+impl<T, R> CPostgresSink<T, R>
 where
     T: Serialize + Send + 'static,
 {
@@ -71,7 +71,7 @@ where
         let pgpool =
             nuclei::block_on(async move { Self::setup_pg(&pg_dsn, pool_size).await.unwrap() });
 
-        let (tx, rx) = crossbeam_channel::unbounded::<CPostgresRow<T>>();
+        let (tx, rx) = crossbeam_channel::unbounded::<CPostgresRow<T, R>>();
 
         let (tx, rx) = (ArchPadding::new(tx), ArchPadding::new(rx));
 
@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<T> Sink<CPostgresRow<T, R>> for CPostgresSink<T, R>
+impl<T, R> Sink<CPostgresRow<T, R>> for CPostgresSink<T, R>
 where
     T: Serialize + Send,
 {
@@ -134,6 +134,7 @@ where
             Poll::Pending
         } else {
             // TODO: Drop the task `data_sink`.
+            // let project = self.pr
             Poll::Ready(Ok(()))
         }
     }
