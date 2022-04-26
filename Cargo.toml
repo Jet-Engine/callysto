@@ -44,8 +44,8 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["epoll", "asyncexec", "sink_postgres"]
-docs = ["store_rocksdb", "sink_elastic"]
+default = ["epoll", "asyncexec"]
+docs = ["store_rocksdb", "sink_elastic", "sink_postgres"]
 # IO systems
 iouring = ["nuclei/iouring"]
 epoll = ["nuclei/epoll"]

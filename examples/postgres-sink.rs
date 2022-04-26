@@ -3,9 +3,7 @@ use callysto::futures::StreamExt;
 use callysto::prelude::message::*;
 use callysto::prelude::postgres::{CPostgresRow, CPostgresSink};
 use callysto::prelude::*;
-use futures::SinkExt;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU32, Ordering};
 
 /// create table spotify ( id bigserial primary key, song_url text );
 /// rpk topic create --brokers localhost:9092 example
