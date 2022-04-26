@@ -49,7 +49,7 @@ jobs:
         timeout-minutes: 40
         with:
           command: test
-          args: --all --features sink_elastic -- --test-threads 1 --nocapture
+          args: --all --features sink_postgres,sink_elastic -- --test-threads 1 --nocapture
 
       - name: Check build
         uses: actions-rs/cargo@v1
