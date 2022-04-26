@@ -40,4 +40,8 @@ pub enum CallystoError {
     #[cfg(feature = "sink_elastic")]
     #[error("ElasticSearch Error")]
     ElasticSearchError(#[from] elasticsearch::Error),
+
+    #[cfg(feature = "sink_postgres")]
+    #[error("Postgres Error")]
+    PostgresError(#[from] deadpool_postgres::tokio_postgres::error::Error),
 }
