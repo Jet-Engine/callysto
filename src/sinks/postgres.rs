@@ -22,14 +22,14 @@ use tracing::{debug, trace, warn};
 use url::Url;
 
 #[derive(Debug)]
-pub struct CPostgresRow<T: ToSql + Sync + 'static + Send> {
+pub struct CPostgresRow<T: ToSql + Sync + 'static + Send > {
     pub query: String,
     pub args: Vec<T>,
 }
 
 impl<T> CPostgresRow<T>
 where
-    T: Send + ToSql + Sync + 'static,
+    T: Send + ToSql + Sync + 'static ,
 {
     pub fn new(query: String, args: Vec<T>) -> Self {
         Self { query, args }
@@ -42,7 +42,7 @@ pin_project! {
     T: ToSql,
     T: Sync,
     T: Send,
-    T: 'static
+    T: 'static,
     {
         client: Arc<deadpool_postgres::Pool>,
         tx: ArchPadding<Sender<CPostgresRow<T>>>,
@@ -54,7 +54,7 @@ pin_project! {
 
 impl<T> CPostgresSink<T>
 where
-    T: ToSql + Sync + 'static + Send,
+    T: ToSql + Sync + 'static + Send 
 {
     async fn setup_pg(dsn: &str, tls: bool, pool_size: usize) -> Result<Pool> {
         // TODO(ansrivas): Currently only NoTls is supported, will add it later.
@@ -91,7 +91,7 @@ where
             while let Ok(item) = rx.recv() {
                 let mut client = inner_client.get().await.unwrap();
                 let stmt = client.prepare_cached(&item.query).await.unwrap();
-                let rows = client.query_raw(&stmt, &item.args).await.unwrap();
+                let rows = client.query_raw(&stmt, item.args.iter().map(|p| p as &dyn ToSql)).await.unwrap();
                 trace!("CPostgresSink - Ingestion status:");
             }
         });
@@ -107,7 +107,7 @@ where
 
 impl<T> Sink<CPostgresRow<T>> for CPostgresSink<T>
 where
-    T: ToSql + Sync + 'static + Send,
+    T: ToSql + Sync + 'static + Send 
 {
     type Error = CallystoError;
 
