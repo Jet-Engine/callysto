@@ -127,7 +127,8 @@ where
                     }
                     let stream = consumer.cstream();
                     let state = state.clone();
-                    let context = Context::new(state);
+                    let mut context = Context::new(state);
+                    context.set_consumer(consumer.consumer_instance());
                     if let Err(e) = Agent::<State>::call(self, stream, context).await {
                         error!("CAgent failed: {}", e);
                         self.crash().await;

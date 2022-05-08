@@ -160,7 +160,8 @@ where
                         // Error while receiving from Kafka.
                         break 'fallback;
                     }
-                    let context = Context::new(state);
+                    let mut context = Context::new(state);
+                    context.set_consumer(consumer.consumer_instance());
                     if let Err(e) = TableAgent::<State>::call(self, message, tables, context).await
                     {
                         error!("CTableAgent failed: {}", e);

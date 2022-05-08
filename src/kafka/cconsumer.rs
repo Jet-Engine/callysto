@@ -60,7 +60,7 @@ impl Stream for CStream {
 }
 
 impl CConsumer {
-    fn consumer_instance(&self) -> Arc<BaseConsumer<CConsumerContext>> {
+    pub(crate) fn consumer_instance(&self) -> Arc<BaseConsumer<CConsumerContext>> {
         self.consumer.clone()
     }
 
