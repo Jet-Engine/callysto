@@ -1,3 +1,4 @@
+use crate::errors::CallystoError;
 use rdkafka::consumer::ConsumerContext;
 use std::fmt;
 
@@ -78,6 +79,23 @@ impl fmt::Display for SecurityProtocol {
     }
 }
 
+impl TryFrom<String> for SecurityProtocol {
+    type Error = CallystoError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value {
+            "PLAINTEXT" => Ok(Self::Plaintext),
+            "SSL" => Ok(Self::Ssl),
+            "SASL_PLAINTEXT" => Ok(Self::SaslPlaintext),
+            "SASL_SSL" => Ok(Self::SaslSsl),
+            r => Err(CallystoError::GeneralError(format!(
+                "Unknown security protocol for Kafka: {}",
+                r
+            ))),
+        }
+    }
+}
+
 ///
 /// SASL Mechanism to use
 /// Possible values are:
@@ -105,6 +123,24 @@ impl fmt::Display for SaslMechanism {
             Self::OauthBearer => "OAUTHBEARER",
         };
         write!(f, "{}", a)
+    }
+}
+
+impl TryFrom<String> for SaslMechanism {
+    type Error = CallystoError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value {
+            "GSSAPI" => Ok(SaslMechanism::GssAPI),
+            "PLAIN" => Ok(SaslMechanism::Plain),
+            "SCRAM-SHA-256" => Ok(SaslMechanism::ScramSha256),
+            "SCRAM-SHA-512" => Ok(SaslMechanism::ScramSha512),
+            "OAUTHBEARER" => Ok(SaslMechanism::OauthBearer),
+            r => Err(CallystoError::GeneralError(format!(
+                "Unknown SASL mechanism: {}",
+                r
+            ))),
+        }
     }
 }
 
