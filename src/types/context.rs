@@ -69,9 +69,9 @@ where
     ///
     /// Commit specific offset of a given message with given mode.
     fn commit_internal(&self, msg: OwnedMessage, commit_mode: CommitMode) -> Result<()> {
-        let consumer = self.get_consumer().ok_or(CallystoError::GeneralError(
-            "No consumer instance set in context.".into(),
-        ))?;
+        let consumer = self.get_consumer().ok_or_else(|| {
+            CallystoError::GeneralError("No consumer instance set in context.".into())
+        })?;
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition_offset(msg.topic(), msg.partition(), Offset(msg.offset()))?;
