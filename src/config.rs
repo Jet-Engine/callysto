@@ -1,4 +1,5 @@
 use crate::kafka::enums::*;
+use std::collections::HashMap;
 
 #[derive(Clone, Default)]
 pub struct Config {
