@@ -3,6 +3,10 @@ use crate::kafka::enums::*;
 #[derive(Clone, Default)]
 pub struct Config {
     ///
+    ///
+    pub datadog_config: Option<DatadogConfig>,
+
+    ///
     /// Kafka Config for the service
     pub kafka_config: KafkaConfig,
 }
@@ -10,6 +14,26 @@ pub struct Config {
 impl Config {
     fn validate(&self) {
         todo!("Validate")
+    }
+}
+
+#[derive(Clone)]
+pub struct DatadogConfig {
+    ///
+    /// Opentelemetry API version
+    pub api_version: u8,
+
+    ///
+    /// Datadog agent endpoint
+    pub agent_endpoint: String,
+}
+
+impl Default for DatadogConfig {
+    fn default() -> Self {
+        Self {
+            api_version: 5,
+            agent_endpoint: String::from("dd"),
+        }
     }
 }
 

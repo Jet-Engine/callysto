@@ -44,7 +44,7 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["epoll", "asyncexec"]
+default = ["epoll", "asyncexec", "sensor_datadog"]
 docs = ["store_rocksdb", "sink_elastic", "sink_postgres"]
 # IO systems
 iouring = ["nuclei/iouring"]
@@ -59,6 +59,13 @@ store_rocksdb = ["rocksdb"]
 # Sinks
 sink_elastic = ["tokio", "elasticsearch"]
 sink_postgres = ["tokio", "deadpool-postgres", "deadpool"]
+# Sensors
+sensor_datadog = [
+    "opentelemetry/rt-async-std",
+    "opentelemetry/rt-tokio",
+    "opentelemetry-datadog",
+    "tracing-opentelemetry"
+]
 
 [dependencies]
 #nuclei = { version = "0.2", default-features = false, features = ["epoll", "async-exec"] }
@@ -95,6 +102,10 @@ deadpool-postgres = { version = "0.10.2", features = [
 ], optional = true }
 deadpool = { version = "0.9.3", optional = true }
 async-global-executor = "2.0.4"
+opentelemetry = { version = "0.17", features = ["rt-tokio"], optional = true }
+opentelemetry-datadog = { version = "0.5", features = ["reqwest-client"], optional = true }
+tracing-opentelemetry = { version = "0.17.2", optional = true }
+
 [dev-dependencies]
 daemonize = "0.4.1"
 dirs = "4.0.0"
