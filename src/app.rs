@@ -532,10 +532,6 @@ where
     }
 
     pub fn run(self) {
-        tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .init();
-
         // Load all background workers
         self.background_workers();
 
