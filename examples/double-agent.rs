@@ -22,9 +22,8 @@ impl SharedState {
 }
 
 async fn counter_agent_1(mut stream: CStream, ctx: Context<SharedState>) -> Result<()> {
-    while let Some(msg) = stream.next().await {
+    while let Some(Some(m)) = stream.next().await {
         // Read the incoming bytes as string
-        let m = msg.unwrap();
         let _strm = m
             .payload_view::<str>()
             .ok_or(CallystoError::GeneralError("Payload view failure".into()))??;
@@ -50,9 +49,8 @@ async fn counter_agent_1(mut stream: CStream, ctx: Context<SharedState>) -> Resu
 }
 
 async fn counter_agent_2(mut stream: CStream, ctx: Context<SharedState>) -> Result<()> {
-    while let Some(msg) = stream.next().await {
+    while let Some(Some(m)) = stream.next().await {
         // Read the incoming bytes as string
-        let m = msg.unwrap();
         let _strm = m
             .payload_view::<str>()
             .ok_or(CallystoError::GeneralError("Payload view failure".into()))??;
