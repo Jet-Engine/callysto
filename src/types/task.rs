@@ -13,7 +13,6 @@ use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
 use tracing::{error, info};
-use tracing_subscriber::filter::FilterExt;
 
 ///////////////////////////////////////////////////
 //////// CTask

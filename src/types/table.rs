@@ -27,7 +27,6 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
-use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
 #[derive(Clone)]

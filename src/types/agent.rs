@@ -17,7 +17,6 @@ use std::io::Read;
 use std::marker::PhantomData as marker;
 use std::sync::Arc;
 use tracing::{error, info};
-use tracing_subscriber::filter::FilterExt;
 
 ///////////////////////////////////////////////////
 //////// CAgent
