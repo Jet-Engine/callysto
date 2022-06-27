@@ -17,7 +17,6 @@ use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber::filter::FilterExt;
 
 ///
 /// Possible states that services can be in.

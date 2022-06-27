@@ -31,7 +31,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
-use tracing_subscriber::filter::FilterExt;
 use url::Url;
 
 const DEFAULT_WRITE_BUFFER_SIZE: usize = (1_usize << 6) * 1024 * 1024; // 64 MB

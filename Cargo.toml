@@ -75,7 +75,6 @@ futures-timer = "3.0.2"
 crossbeam-channel = "0.5.4"
 rdkafka = { version = "0.28.0", default-features = false, features = ["libz"] }
 tracing = "0.1.34"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 url = "2.2.2"
 libc = "0.2.126"
 cuneiform-fields = "0.1.1"
