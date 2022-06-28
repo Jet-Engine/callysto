@@ -18,8 +18,7 @@ impl SharedState {
 }
 
 async fn manual_commit_counter_agent(mut stream: CStream, ctx: Context<SharedState>) -> Result<()> {
-    while let Some(msg) = stream.next().await {
-        let m = msg.unwrap();
+    while let Some(Some(m)) = stream.next().await {
         // Read the incoming bytes as string
         let strm = m.payload_view::<str>().unwrap().unwrap().to_owned();
         println!("Received payload: `{}`", strm);
