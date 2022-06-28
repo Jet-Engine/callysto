@@ -319,11 +319,33 @@ where
         self
     }
 
+    ///
+    /// Use default application client configuration for the topic
     pub fn topic<T>(&self, topic: T) -> CTopic
     where
         T: AsRef<str>,
     {
         let cc = self.build_client_config();
+        CTopic::new(topic, cc)
+    }
+
+    // TODO: We need to allow this to be passed per agent.
+    ///
+    /// Allow passing custom client configuration for a specific topic
+    pub fn topic_with_config<T>(
+        &self,
+        topic: T,
+        client_config: Option<HashMap<String, String>>,
+    ) -> CTopic
+    where
+        T: AsRef<str>,
+    {
+        let mut cc = self.build_client_config();
+        if let Some(icc) = client_config {
+            icc.iter().for_each(|(k, v)| {
+                cc.set(k, v);
+            });
+        }
         CTopic::new(topic, cc)
     }
 
