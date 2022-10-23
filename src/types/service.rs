@@ -20,7 +20,7 @@ use tracing::info;
 
 ///
 /// Possible states that services can be in.
-#[derive(Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, PartialOrd, PartialEq, Eq)]
 pub enum ServiceState {
     PreStart,
     Running,

@@ -226,7 +226,7 @@ where
     }
 
     fn reset_state(&self) -> Result<()> {
-        let _ = self.dbs.clear();
+        self.dbs.clear();
         Ok(())
     }
 

@@ -15,14 +15,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::info;
 
-#[derive(Copy, Clone, PartialOrd, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialOrd, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChangelogOperation {
     Add,
     Discard,
     Update,
 }
 
-#[derive(Clone, PartialOrd, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialOrd, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChangelogKey {
     pub op: ChangelogOperation,
     pub serialized_key: Vec<u8>,
