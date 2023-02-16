@@ -1,4 +1,13 @@
-![callysto](art/callysto_banner_2000x500.png)
+<h1 align="center"><img src="art/callysto_banner_2000x500.png"/></h1>
+<div align="center">
+ <strong>
+    Callysto is stream processing framework for Rust with focus on performance and durability.
+ </strong>
+</div>
+
+<br />
+
+**NOTE: Callysto is used in production environment of multiple companies and it is production ready. This readme will be updated with more information about usage of Callysto.**
 
 ### Requirements
 
