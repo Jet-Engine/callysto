@@ -92,7 +92,7 @@ deadpool-postgres = { version = "0.10.2", features = [
 deadpool = { version = "0.9.5", optional = true }
 async-global-executor = "2.3.0"
 [dev-dependencies]
-daemonize = "0.4.1"
+daemonize = "0.5.0"
 dirs = "4.0.0"
 
 [package.metadata.docs.rs]
