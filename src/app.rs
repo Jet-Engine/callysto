@@ -554,14 +554,21 @@ where
         Ok(())
     }
 
-    pub fn run_agent(agent: Arc<dyn Agent<State>>) -> AsyncTask<()>
-    {
+    ///
+    /// Dynamic runner for [Agent].
+    /// Allows user to run a dynamic agent while application is running.
+    /// This agent is not bookkept, instead user can manage the lifecycle
+    /// of the application with [nuclei::Task] handler.
+    pub fn run_agent(agent: Arc<dyn Agent<State>>) -> AsyncTask<()> {
         info!("Starting dynamic Agent");
 
         nuclei::spawn(async move {
             match agent.start().await {
                 Ok(dep) => dep.await,
-                _ => panic!("Error occurred on start of dynamic Agent with label: {}.", agent.label().await),
+                _ => panic!(
+                    "Error occurred on start of dynamic Agent with label: {}.",
+                    agent.label().await
+                ),
             }
 
             agent.after_start().await;
