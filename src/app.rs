@@ -365,7 +365,9 @@ where
         self
     }
 
-    fn build_client_config(&self) -> ClientConfig {
+    ///
+    /// Builds kafka client config
+    pub fn build_client_config(&self) -> ClientConfig {
         let mut cc = ClientConfig::new();
 
         cc.set("bootstrap.servers", &*self.brokers)
@@ -550,6 +552,20 @@ where
         }
 
         Ok(())
+    }
+
+    pub fn run_agent(agent: Arc<dyn Agent<State>>) -> AsyncTask<()>
+    {
+        info!("Starting dynamic Agent");
+
+        nuclei::spawn(async move {
+            match agent.start().await {
+                Ok(dep) => dep.await,
+                _ => panic!("Error occurred on start of dynamic Agent with label: {}.", agent.label().await),
+            }
+
+            agent.after_start().await;
+        })
     }
 
     pub fn run(self) {
