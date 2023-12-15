@@ -46,8 +46,8 @@ async fn postgres_agent(stream: CStream, _ctx: Context<()>) -> Result<()> {
 fn main() {
     let mut app = Callysto::new();
 
-    app.with_name("elasticsearch-app");
-    app.agent("elastic-agent", app.topic("example"), postgres_agent);
+    app.with_name("postgres-sink-app");
+    app.agent("postgres-agent", app.topic("example"), postgres_agent);
 
     app.run();
 }
