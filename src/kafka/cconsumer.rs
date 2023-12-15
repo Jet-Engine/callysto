@@ -28,6 +28,7 @@ use std::thread;
 use tracing::error;
 
 use crate::kafka::runtime::NucleiRuntime;
+use crate::prelude::CStatistics;
 
 pub struct CConsumer {
     pub(super) consumer: Arc<BaseConsumer<CConsumerContext>>,
@@ -39,8 +40,29 @@ pub struct CConsumer {
 pin_project! {
     #[derive(Clone)]
     pub struct CStream {
+        pub context: Arc<CConsumerContext>,
         #[pin]
         rx: ArchPadding<Receiver<Option<OwnedMessage>>>
+    }
+}
+
+impl CStream {
+    ///
+    /// Get consumer context.
+    pub fn context(&self) -> Arc<CConsumerContext> {
+        self.context.clone()
+    }
+
+    ///
+    /// Topic name
+    pub fn topic_name(&self) -> String {
+        self.context.topic_name.clone()
+    }
+
+    ///
+    /// Consumer statistics
+    pub fn stats(&self) -> Arc<Option<CStatistics>> {
+        self.context.get_stats()
     }
 }
 
@@ -77,6 +99,8 @@ impl CConsumer {
         rx: ArchPadding<Receiver<Option<OwnedMessage>>>,
         consumer: Arc<BaseConsumer<CConsumerContext>>,
     ) -> CStream {
+        let context = consumer.context().clone();
+
         let handle = thread::Builder::new()
             .name("cstream-gen".into())
             .spawn(move || {
@@ -93,6 +117,6 @@ impl CConsumer {
                 }
             });
 
-        CStream { rx }
+        CStream { context, rx }
     }
 }
