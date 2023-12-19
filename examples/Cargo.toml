@@ -1,0 +1,68 @@
+[package]
+name = "examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dev-dependencies]
+daemonize = "0.5"
+callysto = { path = "../callysto" }
+callysto-avro = { path = "../callysto-avro" }
+
+[[example]]
+name = "avro-schema"
+path = "avro-schema.rs"
+
+[[example]]
+name = "basic"
+path = "basic.rs"
+
+[[example]]
+name = "deamonize"
+path = "deamonize.rs"
+
+[[example]]
+name = "double-agent"
+path = "double-agent.rs"
+
+[[example]]
+name = "elastic-sink"
+path = "elastic-sink.rs"
+
+[[example]]
+name = "inmemory"
+path = "inmemory.rs"
+
+[[example]]
+name = "manual-commit"
+path = "manual-commit.rs"
+
+[[example]]
+name = "postgres-sink"
+path = "postgres-sink.rs"
+
+[[example]]
+name = "rocksdb"
+path = "rocksdb.rs"
+
+[[example]]
+name = "syslim"
+path = "syslim.rs"
+
+[[example]]
+name = "task"
+path = "task.rs"
+
+[[example]]
+name = "timer"
+path = "timer.rs"
+
+[[example]]
+name = "web"
+path = "web.rs"
+
+[[example]]
+name = "webstate"
+path = "webstate.rs"
