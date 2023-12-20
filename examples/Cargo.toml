@@ -1,0 +1,74 @@
+[package]
+name = "examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dev-dependencies]
+serde = "1.0"
+tracing = "0.1.37"
+daemonize = "0.5"
+callysto = { path = "../callysto" }
+callysto-avro = { path = "../callysto-avro" }
+
+[[example]]
+name = "avro-sink"
+path = "src/avro-sink.rs"
+
+[[example]]
+name = "avro-stream"
+path = "src/avro-stream.rs"
+
+[[example]]
+name = "basic"
+path = "src/basic.rs"
+
+[[example]]
+name = "deamonize"
+path = "src/deamonize.rs"
+
+[[example]]
+name = "double-agent"
+path = "src/double-agent.rs"
+
+[[example]]
+name = "elastic-sink"
+path = "src/elastic-sink.rs"
+
+[[example]]
+name = "inmemory"
+path = "src/inmemory.rs"
+
+[[example]]
+name = "manual-commit"
+path = "src/manual-commit.rs"
+
+[[example]]
+name = "postgres-sink"
+path = "src/postgres-sink.rs"
+
+[[example]]
+name = "rocksdb"
+path = "src/rocksdb.rs"
+
+[[example]]
+name = "syslim"
+path = "src/syslim.rs"
+
+[[example]]
+name = "task"
+path = "src/task.rs"
+
+[[example]]
+name = "timer"
+path = "src/timer.rs"
+
+[[example]]
+name = "web"
+path = "src/web.rs"
+
+[[example]]
+name = "webstate"
+path = "src/webstate.rs"
