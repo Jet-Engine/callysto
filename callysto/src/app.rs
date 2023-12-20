@@ -514,12 +514,6 @@ where
         cc
     }
 
-    ///
-    /// Create default producer.
-    pub fn producer(cc: ClientConfig) -> FutureProducer {
-        cc.create().expect("Producer creation error.")
-    }
-
     pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {
         if self.storage_url.is_none() {
             panic!("Tables can't be used without storage backend. Bailing...");

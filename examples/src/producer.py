@@ -20,8 +20,7 @@ async def main():
         * 1000
     )
     for i in range(0, 200_000):
-        await produce_message("double-agent-1", data)
-        await produce_message("double-agent-2", data)
+        await produce_message("example", data)
         print(f"Produced {i}")
     print("DONE")
 
