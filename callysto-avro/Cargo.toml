@@ -7,8 +7,8 @@ edition = "2021"
 
 [dependencies]
 apache-avro = "0.16"
-futures-lite = "2.1.0"
-pin-project-lite = "0.2.13"
+futures-lite = "2.1"
+pin-project-lite = "0.2"
 cuneiform-fields = "0.1.1"
 crossbeam-channel = "0.5"
 serde = "1.0"

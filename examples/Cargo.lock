@@ -381,7 +381,7 @@ dependencies = [
  "crossbeam-channel",
  "cuneiform-fields",
  "futures",
- "futures-lite 1.13.0",
+ "futures-lite 2.1.0",
  "futures-timer",
  "http-types",
  "lever",
