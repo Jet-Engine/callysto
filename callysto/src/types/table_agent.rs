@@ -149,7 +149,7 @@ where
             'fallback: loop {
                 info!("Launched CTableAgent executor.");
                 'main: loop {
-                    if self.stopped().await {
+                    if self.is_halting().await {
                         break 'main;
                     }
                     let state = self.state.clone();
@@ -169,21 +169,15 @@ where
                     }
                 }
 
-                if self.stopped().await {
+                if self.is_halting().await {
                     break 'fallback;
                 }
             }
+
+            self.stopped().await;
         };
 
         Ok(closure.boxed())
-    }
-
-    async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn state(&self) -> String {
-        todo!()
     }
 
     async fn label(&self) -> String {

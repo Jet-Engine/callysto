@@ -195,21 +195,13 @@ where
                     "ChangelogManager - {} - Dependencies are starting",
                     short_label
                 );
-                if !x.started().await {
+                if !x.is_started().await {
                     x.start().await;
                 }
             }
         };
 
         Ok(closure.boxed())
-    }
-
-    async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn state(&self) -> String {
-        todo!()
     }
 
     async fn label(&self) -> String {

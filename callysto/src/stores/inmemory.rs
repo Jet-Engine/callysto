@@ -69,37 +69,12 @@ where
     }
 
     async fn restart(&self) -> Result<()> {
-        <Self as Service<State>>::stop(self)
+        <Self as Service<State>>::halt(self)
+            .and_then(|_| <Self as Service<State>>::wait_until_stopped(self))
             .and_then(|_| <Self as Service<State>>::start(self))
             .await;
 
         Ok(())
-    }
-
-    async fn crash(&self) {
-        <Self as Service<State>>::service_state(self)
-            .await
-            .replace_with(|e| ServiceState::Crashed);
-    }
-
-    async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn started(&self) -> bool {
-        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Running
-    }
-
-    async fn stopped(&self) -> bool {
-        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Stopped
-    }
-
-    async fn crashed(&self) -> bool {
-        *<Self as Service<State>>::service_state(self).await.get() == ServiceState::Crashed
-    }
-
-    async fn state(&self) -> String {
-        unimplemented!()
     }
 
     async fn label(&self) -> String {
@@ -112,10 +87,6 @@ where
 
     async fn shortlabel(&self) -> String {
         format!("inmemory:{}", self.table_name)
-    }
-
-    async fn service_state(&self) -> Arc<AtomicBox<ServiceState>> {
-        self.service_state.clone()
     }
 }
 

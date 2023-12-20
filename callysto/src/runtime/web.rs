@@ -104,7 +104,7 @@ where
                     .await
                     .replace_with(|e| ServiceState::Running);
                 'main: loop {
-                    if self.stopped().await {
+                    if self.is_stopped().await {
                         break 'main;
                     }
 
@@ -121,21 +121,13 @@ where
                     }
                 }
 
-                if self.stopped().await {
+                if self.is_stopped().await {
                     break 'fallback;
                 }
             }
         };
 
         Ok(closure.boxed())
-    }
-
-    async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn state(&self) -> String {
-        todo!()
     }
 
     async fn label(&self) -> String {

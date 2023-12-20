@@ -466,14 +466,6 @@ where
         Ok(())
     }
 
-    async fn wait_until_stopped(&self) {
-        todo!()
-    }
-
-    async fn state(&self) -> String {
-        todo!()
-    }
-
     async fn label(&self) -> String {
         format!(
             "{}@{}",
