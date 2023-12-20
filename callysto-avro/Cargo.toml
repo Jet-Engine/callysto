@@ -9,5 +9,8 @@ edition = "2021"
 apache-avro = "0.16"
 futures-lite = "2.1.0"
 pin-project-lite = "0.2.13"
+cuneiform-fields = "0.1.1"
+crossbeam-channel = "0.5"
 serde = "1.0"
+tracing = "0.1"
 callysto = { version = "0.1", path = "../callysto" }

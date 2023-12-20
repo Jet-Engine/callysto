@@ -38,6 +38,7 @@ use crate::types::task::Task;
 
 use crate::prelude::*;
 use futures::Stream;
+use rdkafka::producer::FutureProducer;
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
@@ -176,6 +177,13 @@ where
     /// Build the application with the given config
     pub fn with_config(&mut self, config: Config) -> &mut Self {
         self.config = config;
+        self
+    }
+
+    ///
+    /// Set state on demand for global wide access.
+    pub fn set_state(&mut self, state: State) -> &mut Self {
+        self.state = state;
         self
     }
 
@@ -504,6 +512,12 @@ where
             .map(|e| cc.set("ssl.endpoint.identification.algorithm", format!("{}", e)));
 
         cc
+    }
+
+    ///
+    /// Create default producer.
+    pub fn producer(cc: ClientConfig) -> FutureProducer {
+        cc.create().expect("Producer creation error.")
     }
 
     pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {

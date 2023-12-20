@@ -14,6 +14,10 @@ callysto = { path = "../callysto" }
 callysto-avro = { path = "../callysto-avro" }
 
 [[example]]
+name = "avro-sink"
+path = "src/avro-sink.rs"
+
+[[example]]
 name = "avro-stream"
 path = "src/avro-stream.rs"
 

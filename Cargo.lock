@@ -524,9 +524,12 @@ version = "0.1.0"
 dependencies = [
  "apache-avro",
  "callysto",
+ "crossbeam-channel",
+ "cuneiform-fields",
  "futures-lite 2.1.0",
  "pin-project-lite 0.2.13",
  "serde",
+ "tracing",
 ]
 
 [[package]]
