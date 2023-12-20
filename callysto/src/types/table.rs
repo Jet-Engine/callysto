@@ -170,12 +170,18 @@ where
         let source_topic_stats = source_topic_ccontext.get_stats();
         match &*source_topic_stats {
             Some(stat) => {
+                let stats = stat.stats();
                 let source_topic_meta =
-                    stat.topics.get(source_topic_name.as_str()).ok_or_else(|| {
-                        CallystoError::GeneralError("Source topic is not found in metadata.".into())
-                    })?;
+                    stats
+                        .topics
+                        .get(source_topic_name.as_str())
+                        .ok_or_else(|| {
+                            CallystoError::GeneralError(
+                                "Source topic is not found in metadata.".into(),
+                            )
+                        })?;
                 // dbg!(&source_topic_meta);
-                let changelog_topic_meta = stat
+                let changelog_topic_meta = stats
                     .topics
                     .get(self.changelog_topic.topic_name().as_str())
                     .ok_or_else(|| {
@@ -226,16 +232,16 @@ where
                     let source_topic_stats = source_topic_ccontext.get_stats();
 
                     if let Some(s) = &*source_topic_stats {
-                        let source_topic_meta = s
-                            .topics
-                            .get(source_topic_name.as_str())
-                            .ok_or_else(|| {
-                                CallystoError::NoTopic(
-                                    source_topic_name,
-                                    "Source topic is not found in metadata.".into(),
-                                )
-                            })
-                            .unwrap();
+                        let source_topic_meta =
+                            s.0.topics
+                                .get(source_topic_name.as_str())
+                                .ok_or_else(|| {
+                                    CallystoError::NoTopic(
+                                        source_topic_name,
+                                        "Source topic is not found in metadata.".into(),
+                                    )
+                                })
+                                .unwrap();
                         let source_n = source_topic_meta.partitions.len() - 1;
 
                         self.changelog_topic

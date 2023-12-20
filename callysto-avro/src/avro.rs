@@ -7,7 +7,7 @@ use callysto::nuclei;
 use callysto::nuclei::Task;
 use callysto::prelude::message::OwnedMessage;
 use callysto::prelude::producer::FutureRecord;
-use callysto::prelude::{CStream, ClientConfig};
+use callysto::prelude::{CProducer, CStream, ClientConfig};
 use callysto::rdkafka::Message;
 use crossbeam_channel::Sender;
 use cuneiform_fields::prelude::ArchPadding;
@@ -205,15 +205,12 @@ where
             Schema::parse_str(&*schema).map_err(|e| CallystoError::GeneralError(e.to_string()))?;
         let schema = sch.clone();
         let data_sink = nuclei::spawn(async move {
-            let producer = Callysto::<()>::producer(cc);
+            let producer = CProducer::new(cc);
             while let Ok(item) = rx.recv() {
                 let mut writer = Writer::new(&sch, Vec::new());
                 writer.append_ser(item).unwrap();
                 let encoded = writer.into_inner().unwrap();
-                let rec = FutureRecord::to(&topic).payload(&encoded);
-                producer
-                    .send::<Vec<u8>, _, _>(rec, Duration::from_secs(0))
-                    .await;
+                producer.send_value(&topic, encoded).await;
                 trace!("CAvroSink - Ingestion - Sink received an element.");
             }
         });
