@@ -7,62 +7,64 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
+serde = "1.0"
+tracing = "0.1.37"
 daemonize = "0.5"
 callysto = { path = "../callysto" }
 callysto-avro = { path = "../callysto-avro" }
 
 [[example]]
-name = "avro-schema"
-path = "avro-schema.rs"
+name = "avro-stream"
+path = "src/avro-stream.rs"
 
 [[example]]
 name = "basic"
-path = "basic.rs"
+path = "src/basic.rs"
 
 [[example]]
 name = "deamonize"
-path = "deamonize.rs"
+path = "src/deamonize.rs"
 
 [[example]]
 name = "double-agent"
-path = "double-agent.rs"
+path = "src/double-agent.rs"
 
 [[example]]
 name = "elastic-sink"
-path = "elastic-sink.rs"
+path = "src/elastic-sink.rs"
 
 [[example]]
 name = "inmemory"
-path = "inmemory.rs"
+path = "src/inmemory.rs"
 
 [[example]]
 name = "manual-commit"
-path = "manual-commit.rs"
+path = "src/manual-commit.rs"
 
 [[example]]
 name = "postgres-sink"
-path = "postgres-sink.rs"
+path = "src/postgres-sink.rs"
 
 [[example]]
 name = "rocksdb"
-path = "rocksdb.rs"
+path = "src/rocksdb.rs"
 
 [[example]]
 name = "syslim"
-path = "syslim.rs"
+path = "src/syslim.rs"
 
 [[example]]
 name = "task"
-path = "task.rs"
+path = "src/task.rs"
 
 [[example]]
 name = "timer"
-path = "timer.rs"
+path = "src/timer.rs"
 
 [[example]]
 name = "web"
-path = "web.rs"
+path = "src/web.rs"
 
 [[example]]
 name = "webstate"
-path = "webstate.rs"
+path = "src/webstate.rs"

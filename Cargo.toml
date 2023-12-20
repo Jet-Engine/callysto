@@ -4,3 +4,4 @@ members = [
     "callysto",
     "callysto-avro",
 ]
+exclude = ["examples"]

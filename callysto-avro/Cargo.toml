@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 apache-avro = "0.16"
 futures-lite = "2.1.0"
+pin-project-lite = "0.2.13"
 serde = "1.0"
 callysto = { version = "0.1", path = "../callysto" }

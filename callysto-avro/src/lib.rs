@@ -11,4 +11,5 @@ pub mod avro;
 
 pub mod prelude {
     pub use super::avro::*;
+    pub use apache_avro::*;
 }
