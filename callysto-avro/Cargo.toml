@@ -1,10 +1,45 @@
 [package]
 name = "callysto-avro"
 version = "0.1.0"
+description = "Avro serde for Callysto Stream Processing Framework"
+authors = [
+    "Theo B. <vertexclique@gmail.com>",
+    "Ankur S. <asrivas.cs@gmail.com>",
+]
+keywords = [
+    "stream",
+    "stream-processing",
+    "microservice",
+    "distributed",
+    "database",
+]
+categories = [
+    "concurrency",
+    "asynchronous",
+    "database",
+    "database-implementations",
+]
 edition = "2021"
 rust-version = "1.60"
 license = "Apache-2.0"
 readme = "README.md"
+homepage = "https://vertexclique.github.io/callysto/"
+repository = "https://github.com/vertexclique/callysto"
+exclude = [
+    ".github/*",
+    "examples/*",
+    "tests/*",
+    "art/*",
+    "ci/*",
+    "k8s/*",
+    "benches/*",
+    "doc/*",
+    "docker/*",
+    "docs/*",
+    "*.png",
+    "*.dot",
+    "*.yml",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
