@@ -65,8 +65,8 @@ sink_postgres = ["tokio", "deadpool-postgres", "deadpool"]
 nuclei = "0.2.1"
 lightproc = "0.3.5"
 lever = "0.1.4"
-thiserror = "1.0.51"
-async-trait = "0.1.74"
+thiserror = "1.0"
+async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-timer = "3.0.2"
 crossbeam-channel = "0.5.8"
