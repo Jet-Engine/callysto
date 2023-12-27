@@ -49,6 +49,7 @@ futures-lite = "2.1"
 pin-project-lite = "0.2"
 cuneiform-fields = "0.1.1"
 crossbeam-channel = "0.5"
+polars = { version = "0.35", features = ["avro"] }
 serde = "1.0"
 tracing = "0.1"
 callysto = { version = "0.1", path = "../callysto" }

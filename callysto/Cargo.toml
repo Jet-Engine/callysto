@@ -44,8 +44,10 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["epoll", "asyncexec"]
+default = ["onthefly", "epoll", "asyncexec"]
 docs = ["store_rocksdb", "sink_elastic", "sink_postgres"]
+# On The Fly service management (add/remove/update services, agents, tables).
+onthefly = []
 # IO systems
 iouring = ["nuclei/iouring"]
 epoll = ["nuclei/epoll"]

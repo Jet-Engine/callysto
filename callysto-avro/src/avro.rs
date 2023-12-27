@@ -16,10 +16,14 @@ use pin_project_lite::pin_project;
 use serde::{Deserialize, Serialize};
 use std::convert::identity;
 use std::future::Future;
+use std::io::Cursor;
 use std::marker::PhantomData as marker;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use polars::frame::DataFrame;
+use polars::io::avro::AvroReader;
+use polars::io::SerReader;
 use tracing::trace;
 
 ///
@@ -143,6 +147,58 @@ where
     }
 }
 
+
+pin_project! {
+    /// Dataframe stream for Avro
+    pub struct AvroDFStream
+    {
+        #[pin]
+        stream: CStream,
+        schema: Schema
+    }
+}
+
+impl AvroDFStream
+{
+    pub fn new(stream: CStream, schema: Schema) -> Self {
+        Self {
+            stream,
+            schema
+        }
+    }
+
+    ///
+    /// Give raw [CStream] that this value based deserializer stream is using.
+    pub fn raw_stream(mut self) -> CStream {
+        self.stream
+    }
+}
+
+impl Stream for AvroDFStream {
+    type Item = Result<DataFrame>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        match this.stream.as_mut().poll_next(cx) {
+            Poll::Ready(message) => match message {
+                Some(Some(msg)) => match msg.payload() {
+                    Some(data) => {
+                        let r = Cursor::new(data);
+                        let df = AvroReader::new(r).finish()
+                            .map_err(|e| CallystoError::GeneralError(e.to_string()));
+                        Poll::Ready(Some(df))
+                    },
+                    _ => Poll::Ready(None),
+                },
+                _ => Poll::Ready(None),
+            },
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+
+
 ///
 /// Avro deserializer that takes [Schema] and [CStream].
 pub struct AvroDeserializer {
@@ -170,6 +226,12 @@ impl AvroDeserializer {
         T: for<'ud> Deserialize<'ud>,
     {
         AvroDeserStream::new(self.stream, self.schema)
+    }
+
+    /// Deserialize the stream into a Polar's dataframe.
+    pub async fn deser_df(mut self) -> AvroDFStream
+    {
+        AvroDFStream::new(self.stream, self.schema)
     }
 }
 
