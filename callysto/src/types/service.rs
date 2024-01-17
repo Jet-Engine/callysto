@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
-use tracing::info;
+use http_types::{Request, Response};
+use tracing::*;
 
 ///
 /// Possible states that services can be in.
@@ -95,9 +96,103 @@ where
 //////// CService (Custom Service)
 ///////////////////////////////////////////////////
 
-pub struct CService<State>
+///
+/// Stateful service definition
+pub struct CService<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<State>> + Send + 'static,
 {
+    service_name: String,
+    clo: F,
+    state: State,
     dependencies: Vec<Arc<dyn Service<State>>>,
+}
+
+impl<State, F, Fut> CService<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<State>> + Send + 'static,
+{
+    ///
+    /// Create new stateful service
+    pub fn new<T: AsRef<str>>(service_name: T, service_stub: F, state: State, dependencies: Vec<Arc<dyn Service<State>>>) -> Self {
+        Self {
+            service_name: service_name.as_ref().to_string(),
+            clo: service_stub,
+            state,
+            dependencies
+        }
+    }
+}
+
+#[async_trait]
+impl<State, F, Fut> Service<State> for CService<State, F, Fut>
+where
+    State: Clone + Send + Sync + 'static,
+    F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+    Fut: Future<Output = CResult<State>> + Send + 'static,
+{
+    async fn call(&self, st: Context<State>) -> Result<State> {
+        let fut = (self.clo)(st);
+        let res = fut.await?;
+        Ok(res)
+    }
+
+    async fn start(&self) -> Result<BoxFuture<'_, ()>> {
+        let closure = async move {
+            let label = self.label().await;
+            for x in &self.dependencies {
+                info!("CService - {} - Dependencies are starting", self.service_name);
+                x.start().await;
+            }
+            info!("Started CService {}", label);
+
+            'fallback: loop {
+                info!("Launched CService {} worker.", label);
+                <Self as Service<State>>::service_state(self)
+                    .await
+                    .replace_with(|_e| ServiceState::Running);
+                'main: loop {
+                    if <Self as Service<State>>::stopped(self).await {
+                        break 'main;
+                    }
+                    let state = self.state.clone();
+                    let mut context = Context::new(state);
+                    match CService::<State, F, Fut>::call(self, context).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("CService {} failed: {:?}", label, e);
+                            <Self as Service<State>>::crash(self).await;
+                            break 'main;
+                        }
+                    }
+                }
+
+                if <Self as Service<State>>::stopped(self).await {
+                    break 'fallback;
+                }
+            }
+        };
+
+        Ok(closure.boxed())
+    }
+
+    async fn wait_until_stopped(&self) {
+        todo!()
+    }
+
+    async fn state(&self) -> String {
+        todo!()
+    }
+
+    async fn label(&self) -> String {
+        format!("{}@{}", self.service_name, self.shortlabel().await)
+    }
+
+    async fn shortlabel(&self) -> String {
+        self.service_name.clone()
+    }
 }

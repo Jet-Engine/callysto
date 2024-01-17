@@ -16,6 +16,8 @@ use std::future::Future;
 use std::io::Read;
 use std::marker::PhantomData as marker;
 use std::sync::Arc;
+use std::time::Duration;
+use futures_timer::Delay;
 use tracing::{error, info};
 
 ///////////////////////////////////////////////////
@@ -145,7 +147,9 @@ where
     }
 
     async fn wait_until_stopped(&self) {
-        todo!()
+        while !self.stopped().await {
+            Delay::new(Duration::from_millis(10)).await;
+        }
     }
 
     async fn state(&self) -> String {

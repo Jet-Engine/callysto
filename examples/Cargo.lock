@@ -691,9 +691,12 @@ dependencies = [
 name = "examples"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "callysto",
  "callysto-avro",
  "daemonize",
+ "futures",
+ "futures-timer",
  "serde",
  "tracing",
 ]

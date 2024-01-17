@@ -39,6 +39,7 @@ use crate::types::task::Task;
 use crate::prelude::*;
 use futures::Stream;
 use rdkafka::producer::FutureProducer;
+use crate::types::flows::{CFlow, Flow};
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
@@ -64,6 +65,7 @@ where
     services: LOTable<usize, Arc<dyn Service<State>>>,
     agents: LOTable<usize, Arc<dyn Agent<State>>>,
     tables: LOTable<String, Arc<CTable<State>>>,
+    flows: LOTable<usize, Arc<dyn Service<State>>>,
     table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
     routes: LOTable<String, Arc<dyn Router<State>>>,
 }
@@ -133,6 +135,7 @@ where
             services: LOTable::default(),
             agents: LOTable::default(),
             tables: LOTable::default(),
+            flows: LOTable::default(),
             table_agents: LOTable::default(),
             routes: LOTable::default(),
         }
@@ -185,6 +188,12 @@ where
     pub fn set_state(&mut self, state: State) -> &mut Self {
         self.state = state;
         self
+    }
+
+    ///
+    /// Get state on demand for global wide access.
+    pub fn get_state(&mut self) -> State {
+        self.state.clone()
     }
 
     ///
@@ -314,9 +323,50 @@ where
         self
     }
 
+    /// Helper to define custom service that skips or uses global shared state.
     pub fn service(&self, s: impl Service<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
+        self
+    }
+
+    /// Helper to define flow that skips or uses global shared state.
+    pub fn flow<T: AsRef<str>, F, S, R, Fut>(&self, name: T, stream: S, clo: F) -> &Self
+    where
+        R: 'static + Send,
+        S: Stream + Send + Sync + 'static,
+        State: Clone + Send + Sync + 'static,
+        F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<R>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let flow = CFlow::new(
+            stream,
+            clo,
+            self.app_name.clone(),
+            name.as_ref().to_string(),
+            self.state.clone(),
+            Vec::default(),
+        );
+        self.flows.insert(stub, Arc::new(flow));
+        self
+    }
+
+    /// Helper to define stateful service that uses global application level state.
+    pub fn stateful_service<T, F, Fut>(&self, name: T, clo: F, dependencies: Vec<Arc<dyn Service<State>>>) -> &Self
+    where
+        T: AsRef<str>,
+        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+        Fut: Future<Output = CResult<State>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let service = CService::new(
+            name,
+            clo,
+            self.state.clone(),
+            Vec::default(),
+        );
+        self.services.insert(stub, Arc::new(service));
         self
     }
 

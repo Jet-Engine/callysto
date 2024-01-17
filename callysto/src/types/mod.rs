@@ -9,6 +9,7 @@ pub mod table;
 pub mod table_agent;
 pub mod task;
 pub mod timer;
+pub mod flows;
 
 pub mod prelude {
     pub use super::agent::*;
