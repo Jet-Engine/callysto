@@ -1,15 +1,17 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::stream::FusedStream;
 use futures_lite::{Stream, StreamExt};
 use futures_timer::Delay;
 use pin_project_lite::pin_project;
 use tracing::{error, info};
-use crate::prelude::{Agent, CAgent, Context, CStream, CTopic, Service, ServiceState};
+use crate::prelude::{Agent, CAgent, Context as CContext, CKStream, CTopic, Service, ServiceState};
 use crate::errors::Result as CResult;
 
 // pin_project! {
@@ -38,14 +40,77 @@ use crate::errors::Result as CResult;
 //     }
 // }
 
+pin_project! {
+    #[derive(Clone, Debug)]
+    #[must_use = "you need to poll streams otherwise it won't work"]
+    pub struct CSource<S>
+    where
+        S: Clone
+    {
+        #[pin]
+        pub stream: S
+    }
+}
+
+impl<S> CSource<S>
+    where
+        S: Clone + Stream,
+{
+    /// Create source stream from the given stream.
+    pub fn new(stream: S) -> Self {
+        Self { stream }
+    }
+
+    /// Get underlying stream from the source stream.
+    pub fn underlying(&self) -> S {
+        self.stream.clone()
+    }
+}
+
+impl<S> Stream for CSource<S>
+where
+    S: Clone + Stream,
+{
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        this.stream.poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // stream is either empty or infinite
+        match self.stream.size_hint() {
+            size @ (0, Some(0)) => size,
+            (0, _) => (0, None),
+            _ => (usize::max_value(), None),
+        }
+    }
+}
+
+impl<S> FusedStream for CSource<S>
+where
+    S: Clone + Stream,
+{
+    fn is_terminated(&self) -> bool {
+        // stream is either empty or infinite
+        if let (0, Some(0)) = self.size_hint() {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+
 pub struct CFlow<State, S, R, F, Fut>
 where
-    S: Stream + Send,
+    S: Stream + Clone + Send,
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CSource<S>, CContext<State>) -> Fut,
     Fut: Future<Output = CResult<R>> + Send + 'static,
 {
-    stream: S,
+    stream: CSource<S>,
     clo: F,
     app_name: String,
     flow_name: String,
@@ -57,13 +122,13 @@ where
 impl<State, S, R, F, Fut> CFlow<State, S, R, F, Fut>
 where
     R: 'static,
-    S: Stream + Send,
+    S: Stream + Clone + Send,
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CSource<S>, CContext<State>) -> Fut,
     Fut: Future<Output = CResult<R>> + Send + 'static,
 {
     pub fn new(
-        stream: S,
+        stream: CSource<S>,
         clo: F,
         app_name: String,
         flow_name: String,
@@ -85,23 +150,23 @@ where
 pub trait Flow<S, R, State>: Service<State> + Send + Sync + 'static
 where
     R: 'static,
-    S: Stream + Send,
+    S: Stream + Clone + Send,
     State: Clone + Send + Sync + 'static,
 {
     /// Do work on given stream with state passed in
-    async fn call(&self, stream: &S, st: Context<State>) -> CResult<R>;
+    async fn call(&self, stream: CSource<S>, st: CContext<State>) -> CResult<R>;
 }
 
 #[async_trait]
 impl<State, S, R, F, Fut> Flow<S, R, State> for CFlow<State, S, R, F, Fut>
 where
     R: Send + 'static,
-    S: Stream + Send + Sync + 'static,
+    S: Stream + Clone + Send + Sync + 'static,
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CSource<S>, CContext<State>) -> Fut,
     Fut: Future<Output = CResult<R>> + Send + 'static,
 {
-    async fn call(&self, stream: &S, req: Context<State>) -> CResult<R> {
+    async fn call(&self, stream: CSource<S>, req: CContext<State>) -> CResult<R> {
         let fut = (self.clo)(stream, req);
         let res = fut.await?;
         Ok(res)
@@ -112,12 +177,12 @@ where
 impl<State, S, R, F, Fut> Service<State> for CFlow<State, S, R, F, Fut>
 where
     R: Send + 'static,
-    S: Stream + Send + Sync + 'static,
+    S: Stream + Clone + Send + Sync + 'static,
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CSource<S>, CContext<State>) -> Fut,
     Fut: Future<Output = CResult<R>> + Send + 'static,
 {
-    async fn call(&self, st: Context<State>) -> CResult<State> {
+    async fn call(&self, st: CContext<State>) -> CResult<State> {
         Ok(self.state.clone())
     }
 
@@ -141,8 +206,8 @@ where
                         break 'main;
                     }
                     let state = state.clone();
-                    let mut context = Context::new(state);
-                    if let Err(e) = Flow::<S, R, State>::call(self, &self.stream, context).await {
+                    let mut context = CContext::new(state);
+                    if let Err(e) = Flow::<S, R, State>::call(self, self.stream.clone(), context).await {
                         error!("CFlow failed: {}", e);
                         self.crash().await;
                         break 'main;

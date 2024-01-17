@@ -39,7 +39,7 @@ use crate::types::task::Task;
 use crate::prelude::*;
 use futures::Stream;
 use rdkafka::producer::FutureProducer;
-use crate::types::flows::{CFlow, Flow};
+use crate::types::flows::{CFlow, CSource, Flow};
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
@@ -282,7 +282,7 @@ where
     /// ```
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
-        F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
+        F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
@@ -330,13 +330,18 @@ where
         self
     }
 
+    /// Helper to define sources from streams
+    pub fn source<S: Stream + Clone + Send + Sync + 'static>(&self, stream: S) -> CSource<S> {
+        CSource::new(stream)
+    }
+
     /// Helper to define flow that skips or uses global shared state.
-    pub fn flow<T: AsRef<str>, F, S, R, Fut>(&self, name: T, stream: S, clo: F) -> &Self
+    pub fn flow<T: AsRef<str>, F, S, R, Fut>(&self, name: T, stream: CSource<S>, clo: F) -> &Self
     where
         R: 'static + Send,
-        S: Stream + Send + Sync + 'static,
+        S: Stream + Clone + Send + Sync + 'static,
         State: Clone + Send + Sync + 'static,
-        F: Send + Sync + 'static + Fn(&S, Context<State>) -> Fut,
+        F: Send + Sync + 'static + Fn(CSource<S>, Context<State>) -> Fut,
         Fut: Future<Output = CResult<R>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
@@ -662,6 +667,25 @@ where
 
         let agent_handles = join_all(agents);
 
+        let mut flows: Vec<AsyncTask<()>> = self
+            .flows
+            .iter()
+            .map(|(fid, flow)| {
+                info!("Starting Flow with ID: {}", fid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match flow.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Flow with ID: {}.", fid),
+                    }
+
+                    flow.after_start().await;
+                })
+            })
+            .collect();
+
+        let flow_handles = join_all(flows);
+
         let table_agents: Vec<AsyncTask<()>> = self
             .table_agents
             .iter()
@@ -735,6 +759,7 @@ where
         let timer_handles = join_all(timers);
 
         let agent_poller = nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+        let flow_poller = nuclei::spawn_blocking(move || nuclei::block_on(flow_handles));
         let table_agent_poller =
             nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
         let service_poller = nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
@@ -748,6 +773,7 @@ where
                 service_poller,
                 task_poller,
                 timer_poller,
+                flow_poller
             ])
             .await
         });

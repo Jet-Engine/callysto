@@ -39,14 +39,15 @@ pub struct CConsumer {
 
 pin_project! {
     #[derive(Clone)]
-    pub struct CStream {
+    #[must_use = "you need to poll streams otherwise it won't work"]
+    pub struct CKStream {
         pub context: Arc<CConsumerContext>,
         #[pin]
         rx: ArchPadding<Receiver<Option<OwnedMessage>>>
     }
 }
 
-impl CStream {
+impl CKStream {
     ///
     /// Get consumer context.
     pub fn context(&self) -> Arc<CConsumerContext> {
@@ -66,7 +67,7 @@ impl CStream {
     }
 }
 
-impl Stream for CStream {
+impl Stream for CKStream {
     type Item = Option<OwnedMessage>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -86,7 +87,7 @@ impl CConsumer {
         self.consumer.clone()
     }
 
-    pub fn cstream(&self) -> CStream {
+    pub fn cstream(&self) -> CKStream {
         let (tx, rx) = (self.tx.clone(), self.rx.clone());
         let consumer = self.consumer_instance();
         Self::gen_stream(tx, rx, consumer)
@@ -98,7 +99,7 @@ impl CConsumer {
         tx: ArchPadding<Sender<Option<OwnedMessage>>>,
         rx: ArchPadding<Receiver<Option<OwnedMessage>>>,
         consumer: Arc<BaseConsumer<CConsumerContext>>,
-    ) -> CStream {
+    ) -> CKStream {
         let context = consumer.context().clone();
 
         let handle = thread::Builder::new()
@@ -117,6 +118,6 @@ impl CConsumer {
                 }
             });
 
-        CStream { context, rx }
+        CKStream { context, rx }
     }
 }

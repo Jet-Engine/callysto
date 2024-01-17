@@ -1,19 +1,20 @@
 use callysto::prelude::*;
 use callysto::futures::stream;
-use futures::stream::{self, StreamExt};
+use futures::stream::{Stream, StreamExt};
 use callysto::futures::*;
+use callysto::errors::{Result as CResult, *};
 use std::ops::Mul;
 
 
-async fn multiplier<S: Stream + std::marker::Unpin>(s: &S, ctx: Context<()>) -> Result<()>
+async fn multiplier<S>(mut s: CSource<S>, ctx: Context<()>) -> CResult<()>
 where
-    <S as futures::Stream>::Item: Mul,
-    <<S as futures::Stream>::Item as Mul>::Output: std::fmt::Display
+    S: Stream + Clone + Send + Sync + Unpin,
+    <S as Stream>::Item: std::fmt::Debug
 {
     while let Some(x) = s.next().await {
-        println!("{}", x*x);
+        println!("{:?}", x);
     }
-    Ok(())
+    Ok::<(), CallystoError>(())
 }
 
 fn main() {
@@ -21,8 +22,8 @@ fn main() {
     app.with_name("flow");
 
     let a = [1, 2, 3, 4, 5];
-    let stream = stream::iter(a.iter()).cycle();
-    app.flow("multiplier", stream, multiplier);
+    let source = app.source(stream::iter(a));
+    app.flow("multiplier", source, multiplier);
 
     app.run();
 }

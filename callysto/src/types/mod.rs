@@ -22,6 +22,7 @@ pub mod prelude {
     pub use super::table_agent::*;
     pub use super::task::*;
     pub use super::timer::*;
+    pub use super::flows::*;
 
     // Reexports
 }

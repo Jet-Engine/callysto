@@ -7,7 +7,7 @@ use callysto::nuclei;
 use callysto::nuclei::Task;
 use callysto::prelude::message::OwnedMessage;
 use callysto::prelude::producer::FutureRecord;
-use callysto::prelude::{CStream, ClientConfig};
+use callysto::prelude::{CKStream, ClientConfig};
 use callysto::rdkafka::Message;
 use crossbeam_channel::Sender;
 use cuneiform_fields::prelude::ArchPadding;
@@ -27,19 +27,19 @@ use tracing::trace;
 pin_project! {
     pub struct AvroValueDeserStream {
         #[pin]
-        stream: CStream,
+        stream: CKStream,
         schema: Schema
     }
 }
 
 impl AvroValueDeserStream {
-    pub fn new(stream: CStream, schema: Schema) -> Self {
+    pub fn new(stream: CKStream, schema: Schema) -> Self {
         Self { stream, schema }
     }
 
     ///
-    /// Give raw [CStream] that this value based deserializer stream is using.
-    pub fn raw_stream(mut self) -> CStream {
+    /// Give raw [CKStream] that this value based deserializer stream is using.
+    pub fn raw_stream(mut self) -> CKStream {
         self.stream
     }
 }
@@ -75,7 +75,7 @@ pin_project! {
     pub struct AvroDeserStream<T>
     {
         #[pin]
-        stream: CStream,
+        stream: CKStream,
         schema: Schema,
         _marker: marker<T>
     }
@@ -85,7 +85,7 @@ impl<T> AvroDeserStream<T>
 where
     T: for<'ud> Deserialize<'ud>,
 {
-    pub fn new(stream: CStream, schema: Schema) -> Self {
+    pub fn new(stream: CKStream, schema: Schema) -> Self {
         Self {
             stream,
             schema,
@@ -94,8 +94,8 @@ where
     }
 
     ///
-    /// Give raw [CStream] that this value based deserializer stream is using.
-    pub fn raw_stream(mut self) -> CStream {
+    /// Give raw [CKStream] that this value based deserializer stream is using.
+    pub fn raw_stream(mut self) -> CKStream {
         self.stream
     }
 }
@@ -144,14 +144,14 @@ where
 }
 
 ///
-/// Avro deserializer that takes [Schema] and [CStream].
+/// Avro deserializer that takes [Schema] and [CKStream].
 pub struct AvroDeserializer {
-    stream: CStream,
+    stream: CKStream,
     schema: Schema,
 }
 
 impl AvroDeserializer {
-    pub fn create(mut stream: CStream, schema: &str) -> Result<Self> {
+    pub fn create(mut stream: CKStream, schema: &str) -> Result<Self> {
         let schema =
             Schema::parse_str(schema).map_err(|e| CallystoError::GeneralError(e.to_string()))?;
         Ok(AvroDeserializer { stream, schema })

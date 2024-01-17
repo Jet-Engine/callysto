@@ -1,7 +1,7 @@
 use super::context::Context;
 use crate::errors::Result as CResult;
 use crate::errors::*;
-use crate::kafka::cconsumer::CStream;
+use crate::kafka::cconsumer::CKStream;
 use crate::kafka::ctopic::*;
 use crate::types::service::{Service, ServiceState};
 use crate::types::table::CTable;
@@ -27,7 +27,7 @@ use tracing::{error, info};
 pub struct CAgent<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     clo: F,
@@ -41,7 +41,7 @@ where
 impl<State, F, Fut> CAgent<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     pub fn new(
@@ -73,17 +73,17 @@ where
     State: Clone + Send + Sync + 'static,
 {
     /// Do work on given message with state passed in
-    async fn call(&self, stream: CStream, st: Context<State>) -> CResult<()>;
+    async fn call(&self, stream: CKStream, st: Context<State>) -> CResult<()>;
 }
 
 #[async_trait]
 impl<State, F, Fut> Agent<State> for CAgent<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
-    async fn call(&self, stream: CStream, req: Context<State>) -> CResult<()> {
+    async fn call(&self, stream: CKStream, req: Context<State>) -> CResult<()> {
         let fut = (self.clo)(stream, req);
         let res = fut.await?;
         Ok(res)
@@ -94,7 +94,7 @@ where
 impl<State, F, Fut> Service<State> for CAgent<State, F, Fut>
 where
     State: Clone + Send + Sync + 'static,
-    F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
+    F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
     Fut: Future<Output = CResult<()>> + Send + 'static,
 {
     async fn call(&self, st: Context<State>) -> Result<State> {
