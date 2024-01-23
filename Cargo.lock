@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "callysto"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "async-h1",
  "async-trait",

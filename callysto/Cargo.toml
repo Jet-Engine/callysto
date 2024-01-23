@@ -1,6 +1,6 @@
 [package]
 name = "callysto"
-version = "0.1.10"
+version = "0.1.11"
 description = "Stream processing framework."
 authors = [
     "Theo B. <vertexclique@gmail.com>",
