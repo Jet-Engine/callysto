@@ -691,12 +691,16 @@ dependencies = [
 name = "examples"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
+ "async-dup",
+ "async-h1",
  "async-trait",
  "callysto",
  "callysto-avro",
  "daemonize",
  "futures",
  "futures-timer",
+ "http-types",
  "serde",
  "tracing",
 ]

@@ -12,7 +12,6 @@ use http_types::headers::ToHeaderValues;
 use http_types::Request;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
-use lightproc::prelude::RecoverableHandle;
 use nuclei::Task as AsyncTask;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
@@ -282,7 +281,7 @@ where
     /// ```
     pub fn agent<T: AsRef<str>, F, Fut>(&self, name: T, topic: CTopic, clo: F) -> &Self
     where
-        F: Send + Sync + 'static + Fn(CKStream, Context<State>) -> Fut,
+        F: Send + Sync + 'static + Fn(CStream, Context<State>) -> Fut,
         Fut: Future<Output = CResult<()>> + Send + 'static,
     {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);

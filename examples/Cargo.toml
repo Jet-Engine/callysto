@@ -13,6 +13,10 @@ daemonize = "0.5"
 async-trait = "0.1"
 futures-timer = "3.0"
 futures = "0.3"
+anyhow = "1.0"
+async-h1 = "2.3"
+async-dup = "1.2"
+http-types = "2.12"
 callysto = { path = "../callysto" }
 callysto-avro = { path = "../callysto-avro" }
 
@@ -43,6 +47,10 @@ path = "src/double-agent.rs"
 [[example]]
 name = "elastic-sink"
 path = "src/elastic-sink.rs"
+
+[[example]]
+name = "httpserv"
+path = "src/httpserv.rs"
 
 [[example]]
 name = "flow"

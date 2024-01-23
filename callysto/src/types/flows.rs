@@ -11,36 +11,12 @@ use futures_lite::{Stream, StreamExt};
 use futures_timer::Delay;
 use pin_project_lite::pin_project;
 use tracing::{error, info};
-use crate::prelude::{Agent, CAgent, Context as CContext, CKStream, CTopic, Service, ServiceState};
+use crate::prelude::{Agent, CAgent, Context as CContext, CStream, CTopic, Service, ServiceState};
 use crate::errors::Result as CResult;
 
-// pin_project! {
-//     pub struct CFlow<State, S, R, F, Fut>
-//     where
-//         S: Stream,
-//         State: Clone,
-//         State: Send,
-//         State: Sync,
-//         State: 'static,
-//         F: Send,
-//         F: Sync,
-//         F: 'static,
-//         F: Fn(S, Context<State>) -> Fut,
-//         Fut: Future<Output = CResult<R>>,
-//         Fut: Send,
-//         Fut: 'static,
-//     {
-//         #[pin]
-//         stream: S,
-//         clo: F,
-//         app_name: String,
-//         flow_name: String,
-//         state: State,
-//         dependencies: Vec<Arc<dyn Service<State>>>,
-//     }
-// }
-
 pin_project! {
+    ///
+    /// Flow that wraps the Source stream.
     #[derive(Clone, Debug)]
     #[must_use = "you need to poll streams otherwise it won't work"]
     pub struct CSource<S>
