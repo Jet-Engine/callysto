@@ -54,7 +54,7 @@ pub enum PartitionAssignment {
     RangeAssignor,
     RoundRobinAssignor,
     CooperativeStickyAssignor,
-    CustomAssignor(Box<dyn ConsumerContext>), // todo: implement assign
+    // CustomAssignor(Box<dyn ConsumerContext>), // todo: implement assign
 }
 
 ///

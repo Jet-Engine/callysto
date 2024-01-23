@@ -1,16 +1,55 @@
 [package]
 name = "callysto-avro"
-version = "0.1.0"
+version = "0.1.1"
+description = "Avro serde for Callysto Stream Processing Framework"
+authors = [
+    "Theo B. <vertexclique@gmail.com>",
+    "Ankur S. <asrivas.cs@gmail.com>",
+]
+keywords = [
+    "stream",
+    "stream-processing",
+    "microservice",
+    "distributed",
+    "database",
+]
+categories = [
+    "concurrency",
+    "asynchronous",
+    "database",
+    "database-implementations",
+]
 edition = "2021"
+rust-version = "1.60"
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://vertexclique.github.io/callysto/"
+repository = "https://github.com/vertexclique/callysto"
+exclude = [
+    ".github/*",
+    "examples/*",
+    "tests/*",
+    "art/*",
+    "ci/*",
+    "k8s/*",
+    "benches/*",
+    "doc/*",
+    "docker/*",
+    "docs/*",
+    "*.png",
+    "*.dot",
+    "*.yml",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 apache-avro = "0.16"
-futures-lite = "2.1.0"
-pin-project-lite = "0.2.13"
+futures-lite = "2.1"
+pin-project-lite = "0.2"
 cuneiform-fields = "0.1.1"
 crossbeam-channel = "0.5"
+polars = { version = "0.35", features = ["avro"] }
 serde = "1.0"
 tracing = "0.1"
 callysto = { version = "0.1", path = "../callysto" }

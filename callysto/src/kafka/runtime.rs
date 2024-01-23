@@ -22,7 +22,7 @@ impl AsyncRuntime for NucleiRuntime {
     where
         T: Future<Output = ()> + Send + 'static,
     {
-        let _ = nuclei::spawn(task);
+        nuclei::spawn(task);
     }
 
     fn delay_for(duration: Duration) -> Self::Delay {

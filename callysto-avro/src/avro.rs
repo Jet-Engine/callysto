@@ -7,7 +7,7 @@ use callysto::nuclei;
 use callysto::nuclei::Task;
 use callysto::prelude::message::OwnedMessage;
 use callysto::prelude::producer::FutureRecord;
-use callysto::prelude::{CStream, ClientConfig};
+use callysto::prelude::{CProducer, CStream, ClientConfig};
 use callysto::rdkafka::Message;
 use crossbeam_channel::Sender;
 use cuneiform_fields::prelude::ArchPadding;
@@ -16,10 +16,14 @@ use pin_project_lite::pin_project;
 use serde::{Deserialize, Serialize};
 use std::convert::identity;
 use std::future::Future;
+use std::io::Cursor;
 use std::marker::PhantomData as marker;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use polars::frame::DataFrame;
+use polars::io::avro::AvroReader;
+use polars::io::SerReader;
 use tracing::trace;
 
 ///
@@ -143,6 +147,58 @@ where
     }
 }
 
+
+pin_project! {
+    /// Dataframe stream for Avro
+    pub struct AvroDFStream
+    {
+        #[pin]
+        stream: CStream,
+        schema: Schema
+    }
+}
+
+impl AvroDFStream
+{
+    pub fn new(stream: CStream, schema: Schema) -> Self {
+        Self {
+            stream,
+            schema
+        }
+    }
+
+    ///
+    /// Give raw [CStream] that this value based deserializer stream is using.
+    pub fn raw_stream(mut self) -> CStream {
+        self.stream
+    }
+}
+
+impl Stream for AvroDFStream {
+    type Item = Result<DataFrame>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        match this.stream.as_mut().poll_next(cx) {
+            Poll::Ready(message) => match message {
+                Some(Some(msg)) => match msg.payload() {
+                    Some(data) => {
+                        let r = Cursor::new(data);
+                        let df = AvroReader::new(r).finish()
+                            .map_err(|e| CallystoError::GeneralError(e.to_string()));
+                        Poll::Ready(Some(df))
+                    },
+                    _ => Poll::Ready(None),
+                },
+                _ => Poll::Ready(None),
+            },
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+
+
 ///
 /// Avro deserializer that takes [Schema] and [CStream].
 pub struct AvroDeserializer {
@@ -170,6 +226,12 @@ impl AvroDeserializer {
         T: for<'ud> Deserialize<'ud>,
     {
         AvroDeserStream::new(self.stream, self.schema)
+    }
+
+    /// Deserialize the stream into a Polar's dataframe.
+    pub async fn deser_df(mut self) -> AvroDFStream
+    {
+        AvroDFStream::new(self.stream, self.schema)
     }
 }
 
@@ -205,15 +267,12 @@ where
             Schema::parse_str(&*schema).map_err(|e| CallystoError::GeneralError(e.to_string()))?;
         let schema = sch.clone();
         let data_sink = nuclei::spawn(async move {
-            let producer = Callysto::<()>::producer(cc);
+            let producer = CProducer::new(cc);
             while let Ok(item) = rx.recv() {
                 let mut writer = Writer::new(&sch, Vec::new());
                 writer.append_ser(item).unwrap();
                 let encoded = writer.into_inner().unwrap();
-                let rec = FutureRecord::to(&topic).payload(&encoded);
-                producer
-                    .send::<Vec<u8>, _, _>(rec, Duration::from_secs(0))
-                    .await;
+                producer.send_value(&topic, encoded).await;
                 trace!("CAvroSink - Ingestion - Sink received an element.");
             }
         });

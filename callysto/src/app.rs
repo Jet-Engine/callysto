@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::fmt::Alignment::Center;
 use std::future::Future;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::future::join_all;
 use http_types::headers::ToHeaderValues;
@@ -37,6 +38,7 @@ use crate::types::task::Task;
 
 use crate::prelude::*;
 use futures::Stream;
+use futures_timer::Delay;
 use rdkafka::producer::FutureProducer;
 use crate::types::flows::{CFlow, CSource, Flow};
 
@@ -568,12 +570,6 @@ where
         cc
     }
 
-    ///
-    /// Create default producer.
-    pub fn producer(cc: ClientConfig) -> FutureProducer {
-        cc.create().expect("Producer creation error.")
-    }
-
     pub fn table<T: AsRef<str>>(&self, table_name: T) -> CTable<State> {
         if self.storage_url.is_none() {
             panic!("Tables can't be used without storage backend. Bailing...");
@@ -643,11 +639,13 @@ where
         })
     }
 
+
+
     pub fn run(self) {
         // Load all background workers
         self.background_workers();
 
-        let mut agents: Vec<AsyncTask<()>> = self
+        let agents: Vec<AsyncTask<()>> = self
             .agents
             .iter()
             .map(|(aid, agent)| {
@@ -765,16 +763,119 @@ where
         let task_poller = nuclei::spawn_blocking(move || nuclei::block_on(task_handles));
         let timer_poller = nuclei::spawn_blocking(move || nuclei::block_on(timer_handles));
 
-        nuclei::block_on(async move {
-            join_all(vec![
-                agent_poller,
-                table_agent_poller,
-                service_poller,
-                task_poller,
-                timer_poller,
-                flow_poller
-            ])
-            .await
-        });
+        #[cfg(feature = "onthefly")]
+        {
+            nuclei::spawn_blocking(move || nuclei::block_on(
+                join_all(vec![
+                    agent_poller,
+                    table_agent_poller,
+                    service_poller,
+                    task_poller,
+                    timer_poller,
+                    flow_poller
+                ])
+            ));
+
+            loop {
+                nuclei::block_on(async move {
+                    Delay::new(Duration::from_secs(5)).await;
+                });
+
+                let onthefly = async {
+                    let mut agents: Vec<AsyncTask<()>> = Vec::new();
+
+                    for (aid, agent) in self.agents.iter() {
+                        if !agent.started().await {
+                            info!("Starting Agent with ID: {}", aid);
+                            // TODO: Recovery should be here.
+                            let task = nuclei::spawn(async move {
+                                match agent.start().await {
+                                    Ok(dep) => dep.await,
+                                    _ => panic!("Error occurred on start of Agent with ID: {}.", aid),
+                                }
+
+                                agent.after_start().await;
+                            });
+                            agents.push(task);
+                        }
+                    }
+
+                    let agent_handles = join_all(agents);
+
+                    let mut table_agents: Vec<AsyncTask<()>> = Vec::new();
+
+                    for (aid, table_agent) in self.table_agents.iter() {
+                        if !table_agent.started().await {
+                            info!("Starting Table Agent with ID: {}", aid);
+                            // TODO: Recovery should be here.
+                            let task = nuclei::spawn(async move {
+                                match table_agent.start().await {
+                                    Ok(dep) => dep.await,
+                                    _ => panic!("Error occurred on start of Table Agent with ID: {}.", aid),
+                                }
+
+                                table_agent.after_start().await;
+                            });
+                            table_agents.push(task);
+                        }
+                    }
+
+                    let table_agent_handles = join_all(table_agents);
+
+                    let mut services: Vec<AsyncTask<()>> = Vec::new();
+
+                    for (sid, service) in self.services.iter() {
+                        if !service.started().await {
+                            info!("Starting Service with ID: {}", sid);
+                            // TODO: Recovery should be here.
+                            let task = nuclei::spawn(async move {
+                                match service.start().await {
+                                    Ok(dep) => dep.await,
+                                    _ => panic!("Error occurred on start of Service with ID: {}.", sid),
+                                }
+
+                                service.after_start().await;
+                            });
+                            services.push(task);
+                        }
+                    }
+
+                    let service_handles = join_all(services);
+
+                    let agent_poller = nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+                    let table_agent_poller =
+                        nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
+                    let service_poller = nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
+
+                    nuclei::spawn_blocking(move || nuclei::block_on(
+                        join_all(vec![
+                            agent_poller,
+                            table_agent_poller,
+                            service_poller
+                        ])
+                    ));
+                };
+
+
+                nuclei::block_on(async move {
+                    Delay::new(Duration::from_secs(10)).await;
+                });
+            }
+        }
+
+        #[cfg(not(feature = "onthefly"))]
+        {
+            nuclei::block_on(async move {
+                join_all(vec![
+                    agent_poller,
+                    table_agent_poller,
+                    service_poller,
+                    task_poller,
+                    timer_poller,
+                    flow_poller
+                ])
+                    .await
+            });
+        }
     }
 }
