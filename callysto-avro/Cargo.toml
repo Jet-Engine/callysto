@@ -1,6 +1,6 @@
 [package]
 name = "callysto-avro"
-version = "0.1.1"
+version = "0.1.2"
 description = "Avro serde for Callysto Stream Processing Framework"
 authors = [
     "Theo B. <vertexclique@gmail.com>",
