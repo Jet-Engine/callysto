@@ -11,7 +11,6 @@ use futures_timer::Delay;
 use lever::prelude::{LOTable, TTas};
 use lever::sync::atomics::AtomicBox;
 use lever::sync::ifaces::LockIface;
-use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
 use rdkafka::Message;
 use rocksdb::{

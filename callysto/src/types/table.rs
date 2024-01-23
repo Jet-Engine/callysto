@@ -17,7 +17,6 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, SinkExt};
 use futures_timer::Delay;
 use lever::sync::atomics::AtomicBox;
-use lightproc::prelude::State;
 use rdkafka::message::OwnedMessage;
 use rdkafka::{ClientConfig, ClientContext, Message};
 use serde::de::DeserializeOwned;

@@ -3,13 +3,13 @@ use callysto::kafka::cconsumer::CStream;
 use callysto::kafka::enums::OffsetReset;
 use callysto::prelude::message::*;
 use callysto::prelude::*;
-use callysto_avro::prelude::*;
 use callysto_avro::prelude::types::*;
+use callysto_avro::prelude::*;
+use serde::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
-use serde::*;
 
 #[derive(Clone)]
 struct SharedState {
@@ -35,21 +35,25 @@ async fn avro_raw_stream(mut stream: CStream, ctx: Context<SharedState>) -> Resu
         ]
     }
 "#;
-    let mut s = AvroDeserializer::create(stream, raw_schema)?.deser_raw().await;
+    let mut s = AvroDeserializer::create(stream, raw_schema)?
+        .deser_raw()
+        .await;
     while let Some(Ok(m)) = s.next().await {
         // Read the incoming bytes as JSON value
-        let record = m.iter().map(|e| e.as_ref().unwrap()).collect::<Vec<&Value>>();
+        let record = m
+            .iter()
+            .map(|e| e.as_ref().unwrap())
+            .collect::<Vec<&Value>>();
         println!("avro_raw_stream: Received record: {:?}", record);
     }
 
     Ok(())
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 struct Test {
     a: u64,
-    b: String
+    b: String,
 }
 async fn avro_typed_stream(mut stream: CStream, ctx: Context<SharedState>) -> Result<()> {
     let raw_schema = r#"
@@ -62,7 +66,9 @@ async fn avro_typed_stream(mut stream: CStream, ctx: Context<SharedState>) -> Re
         ]
     }
 "#;
-    let mut s = AvroDeserializer::create(stream, raw_schema)?.deser::<Test>().await;
+    let mut s = AvroDeserializer::create(stream, raw_schema)?
+        .deser::<Test>()
+        .await;
     while let Some(Ok(record)) = s.next().await {
         // Read the incoming bytes as JSON value
         println!("avro_typed_stream: Received record: {:?}", record);
@@ -81,11 +87,7 @@ fn main() {
 
     app.with_config(config);
     app.with_name("avro-stream");
-    app.agent(
-        "avro_raw_stream",
-        app.topic("avro"),
-        avro_raw_stream,
-    );
+    app.agent("avro_raw_stream", app.topic("avro"), avro_raw_stream);
     app.agent(
         "avro_typed_stream",
         app.topic("avrotyped"),

@@ -39,6 +39,7 @@ pub struct CConsumer {
 
 pin_project! {
     #[derive(Clone)]
+    #[must_use = "you need to poll streams otherwise it won't work"]
     pub struct CStream {
         pub context: Arc<CConsumerContext>,
         #[pin]

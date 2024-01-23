@@ -13,7 +13,6 @@ use http_types::headers::ToHeaderValues;
 use http_types::Request;
 use lever::prelude::{HOPTable, LOTable};
 use lever::sync::atomics::AtomicBox;
-use lightproc::prelude::RecoverableHandle;
 use nuclei::Task as AsyncTask;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer};
 use rdkafka::error::KafkaResult;
@@ -41,6 +40,7 @@ use crate::prelude::*;
 use futures::Stream;
 use futures_timer::Delay;
 use rdkafka::producer::FutureProducer;
+use crate::types::flows::{CFlow, CSource, Flow};
 
 // TODO: not sure static dispatch is better here. Check on using State: 'static.
 
@@ -66,6 +66,7 @@ where
     services: LOTable<usize, Arc<dyn Service<State>>>,
     agents: LOTable<usize, Arc<dyn Agent<State>>>,
     tables: LOTable<String, Arc<CTable<State>>>,
+    flows: LOTable<usize, Arc<dyn Service<State>>>,
     table_agents: LOTable<usize, Arc<dyn TableAgent<State>>>,
     routes: LOTable<String, Arc<dyn Router<State>>>,
 }
@@ -135,6 +136,7 @@ where
             services: LOTable::default(),
             agents: LOTable::default(),
             tables: LOTable::default(),
+            flows: LOTable::default(),
             table_agents: LOTable::default(),
             routes: LOTable::default(),
         }
@@ -187,6 +189,12 @@ where
     pub fn set_state(&mut self, state: State) -> &mut Self {
         self.state = state;
         self
+    }
+
+    ///
+    /// Get state on demand for global wide access.
+    pub fn get_state(&mut self) -> State {
+        self.state.clone()
     }
 
     ///
@@ -316,9 +324,55 @@ where
         self
     }
 
+    /// Helper to define custom service that skips or uses global shared state.
     pub fn service(&self, s: impl Service<State>) -> &Self {
         let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
         self.services.insert(stub, Arc::new(s));
+        self
+    }
+
+    /// Helper to define sources from streams
+    pub fn source<S: Stream + Clone + Send + Sync + 'static>(&self, stream: S) -> CSource<S> {
+        CSource::new(stream)
+    }
+
+    /// Helper to define flow that skips or uses global shared state.
+    pub fn flow<T: AsRef<str>, F, S, R, Fut>(&self, name: T, stream: CSource<S>, clo: F) -> &Self
+    where
+        R: 'static + Send,
+        S: Stream + Clone + Send + Sync + 'static,
+        State: Clone + Send + Sync + 'static,
+        F: Send + Sync + 'static + Fn(CSource<S>, Context<State>) -> Fut,
+        Fut: Future<Output = CResult<R>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let flow = CFlow::new(
+            stream,
+            clo,
+            self.app_name.clone(),
+            name.as_ref().to_string(),
+            self.state.clone(),
+            Vec::default(),
+        );
+        self.flows.insert(stub, Arc::new(flow));
+        self
+    }
+
+    /// Helper to define stateful service that uses global application level state.
+    pub fn stateful_service<T, F, Fut>(&self, name: T, clo: F, dependencies: Vec<Arc<dyn Service<State>>>) -> &Self
+    where
+        T: AsRef<str>,
+        F: Send + Sync + 'static + Fn(Context<State>) -> Fut,
+        Fut: Future<Output = CResult<State>> + Send + 'static,
+    {
+        let stub = self.stubs.fetch_add(1, Ordering::AcqRel);
+        let service = CService::new(
+            name,
+            clo,
+            self.state.clone(),
+            Vec::default(),
+        );
+        self.services.insert(stub, Arc::new(service));
         self
     }
 
@@ -610,6 +664,25 @@ where
 
         let agent_handles = join_all(agents);
 
+        let mut flows: Vec<AsyncTask<()>> = self
+            .flows
+            .iter()
+            .map(|(fid, flow)| {
+                info!("Starting Flow with ID: {}", fid);
+                // TODO: Recovery should be here.
+                nuclei::spawn(async move {
+                    match flow.start().await {
+                        Ok(dep) => dep.await,
+                        _ => panic!("Error occurred on start of Flow with ID: {}.", fid),
+                    }
+
+                    flow.after_start().await;
+                })
+            })
+            .collect();
+
+        let flow_handles = join_all(flows);
+
         let table_agents: Vec<AsyncTask<()>> = self
             .table_agents
             .iter()
@@ -683,6 +756,7 @@ where
         let timer_handles = join_all(timers);
 
         let agent_poller = nuclei::spawn_blocking(move || nuclei::block_on(agent_handles));
+        let flow_poller = nuclei::spawn_blocking(move || nuclei::block_on(flow_handles));
         let table_agent_poller =
             nuclei::spawn_blocking(move || nuclei::block_on(table_agent_handles));
         let service_poller = nuclei::spawn_blocking(move || nuclei::block_on(service_handles));
@@ -698,6 +772,7 @@ where
                     service_poller,
                     task_poller,
                     timer_poller,
+                    flow_poller
                 ])
             ));
 
@@ -797,6 +872,7 @@ where
                     service_poller,
                     task_poller,
                     timer_poller,
+                    flow_poller
                 ])
                     .await
             });

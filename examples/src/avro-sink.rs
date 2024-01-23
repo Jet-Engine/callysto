@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 struct State {
-    pub cc: Option<ClientConfig>
+    pub cc: Option<ClientConfig>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,13 +42,13 @@ async fn avro_sink(stream: CStream, ctx: Context<State>) -> Result<()> {
         .map(|(idx, m)| {
             m.map(|e| {
                 println!("Producing spotify song...");
-                SpotifyDocument::new("https://open.spotify.com/track/5qdhrNibheeUS7HVSJ1m3T".to_string())
+                SpotifyDocument::new(
+                    "https://open.spotify.com/track/5qdhrNibheeUS7HVSJ1m3T".to_string(),
+                )
             })
             .ok_or(CallystoError::GeneralError("No payload".into()))
         })
-        .forward(
-            CAvroSink::new("avrosink".into(), raw_schema.into(), cc.clone(), 0).unwrap(),
-        )
+        .forward(CAvroSink::new("avrosink".into(), raw_schema.into(), cc.clone(), 0).unwrap())
         .await?;
 
     Ok(())
@@ -57,7 +57,9 @@ async fn avro_sink(stream: CStream, ctx: Context<State>) -> Result<()> {
 fn main() {
     let mut app = Callysto::with_state(State { cc: None });
 
-    app.set_state(State { cc: Some(app.build_client_config()) });
+    app.set_state(State {
+        cc: Some(app.build_client_config()),
+    });
     app.with_name("avro-sink-app");
     app.agent("avro-sink", app.topic("avro"), avro_sink);
 
