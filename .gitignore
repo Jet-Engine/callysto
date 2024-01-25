@@ -3,3 +3,4 @@
 callysto/Cargo.lock
 venv/
 **/target/
+Cargo.lock
