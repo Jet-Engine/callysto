@@ -82,6 +82,8 @@ where
                 .unwrap()
         });
 
+        info!("using clone version of postgres library sink");
+
         let (tx, rx) = crossbeam_channel::unbounded::<CPostgresRow<T>>();
         let (tx, rx) = (ArchPadding::new(tx), ArchPadding::new(rx));
 
@@ -89,10 +91,24 @@ where
         let client = Arc::new(pgpool);
         let data_sink = nuclei::spawn(async move {
             while let Ok(item) = rx.recv() {
-                let mut client = inner_client.get().await.unwrap();
-                let stmt = client.prepare_cached(&item.query).await.unwrap();
-                let rows = client.query_raw(&stmt, &item.args).await.unwrap();
-                trace!("CPostgresSink - Ingestion status:");
+                let mut client = inner_client.get().await.unwrap_or_else(|e| {
+                    error!("{:?}", e);
+                });
+                let stmt = client
+                    .prepare_cached(&item.query)
+                    .await
+                    .unwrap_or_else(|e| {
+                        error!("{:?}", e);
+                    });
+                info!("statement: {:?}", stmt);
+                let rows = client
+                    .query_raw(&stmt, &item.args)
+                    .await
+                    .unwrap_or_else(|e| {
+                        error!("{:?}", e);
+                    });
+                info!("rows: {:?}", rows);
+                info!("CPostgresSink - Ingestion status:");
             }
         });
 
