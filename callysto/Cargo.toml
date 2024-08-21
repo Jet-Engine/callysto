@@ -68,13 +68,13 @@ async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 futures-timer = "3.0"
 crossbeam-channel = "0.5"
-rdkafka = { version = "0.36.0", default-features = false, features = ["libz"] }
+rdkafka = { version = "0.36.2", default-features = false, features = ["libz"] }
 tracing = "0.1"
 url = "2.5"
 libc = "0.2"
 cuneiform-fields = "0.1.1"
-serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.114"
 bincode = "1.3.3"
 http-types = "2.12.0"
 async-h1 = "2.3"
@@ -82,7 +82,7 @@ pin-project-lite = "0.2"
 futures-lite = "2.2"
 
 # Optionals
-rocksdb = { version = "0.19.0", optional = true }
+rocksdb = { version = "0.22.0", optional = true }
 elasticsearch = { version = "7.14.0-alpha.1", optional = true }
 deadpool-postgres = { version = "0.12", features = [
     "serde",
